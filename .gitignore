@@ -1,0 +1,6 @@
+__pycache__
+env
+.vscode
+notes.txt
+bitmex_connect.py
+ta_connect.py
