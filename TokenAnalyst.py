@@ -3,7 +3,6 @@ import os
 import json
 import asyncio
 import sys
-import async_helpers
 
 # ANSI colors
 c = (
@@ -23,8 +22,6 @@ class TokenAnalyst:
         id = "token_analyst_stream"
         channel = "exchange_flows"
         payload = {"event":"subscribe","channel":channel,"id":id,"key":self._key}
-        
-        print(c[1] + '\nAbout to connect\n' + c[0])
 
         async with websockets.connect(uri) as websocket:
             self._ws = websocket
@@ -32,6 +29,7 @@ class TokenAnalyst:
             async for msg in websocket: 
                 data = await self.interpret(json.loads(msg), id)
                 yield data 
+
 
     async def close(self):
         await self._ws.close()
@@ -52,13 +50,16 @@ class TokenAnalyst:
 
     async def on_data(self, data): 
         if(data['flowType'] == 'Inflow'):
-            return("Received data: " + str(data))
+            return data
+
 
     async def on_heartbeat(self, heartbeat):
-        return("Received heartbeat: " + str(heartbeat)) 
+        print(c[1] + "\nReceived heartbeat - server time: " + str(heartbeat['serverTime']) + "\n" + c[0]) 
+
 
     async def on_subscribed(self, details):
-        return("Successfully subscribed: " + str(details))
+        print(c[1] + "\nToken Analyst connection successful. " + str(details['message']) + "\n" + c[0])
+
 
     async def on_error(self, error):
         print(c[2] + "\nTokenAnalyst error - " + error['message'] + "\n" + c[0])
