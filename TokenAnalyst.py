@@ -4,6 +4,7 @@ import json
 import asyncio
 import sys
 
+
 # ANSI colors
 c = (
     "\033[0m",   # End of color
@@ -20,7 +21,7 @@ class TokenAnalyst:
     async def connect(self):
         uri = "wss://ws.tokenanalyst.io"
         id = "token_analyst_stream"
-        channel = "exchange_flows"
+        channel = "btc_unconfirmed_exchange_flows"
         payload = {"event":"subscribe","channel":channel,"id":id,"key":self._key}
 
         async with websockets.connect(uri) as websocket:
@@ -33,7 +34,7 @@ class TokenAnalyst:
 
     async def close(self):
         await self._ws.close()
-        print(c[3] + '\nTokenAnalyst connection closed \n' + c[0])
+        print(c[3] + '\nTokenAnalyst connection closed' + c[0])
 
 
 
@@ -54,15 +55,15 @@ class TokenAnalyst:
 
 
     async def on_heartbeat(self, heartbeat):
-        print(c[1] + "\nReceived heartbeat - server time: " + str(heartbeat['serverTime']) + "\n" + c[0]) 
+        print(c[1] + "\nToken Analyst heartbeat - server time: " + str(heartbeat['serverTime']) + c[0]) 
 
 
     async def on_subscribed(self, details):
-        print(c[1] + "\nToken Analyst connection successful. " + str(details['message']) + "\n" + c[0])
+        print(c[1] + "\nToken Analyst connection successful. " + str(details['message']) + c[0])
 
 
     async def on_error(self, error):
-        print(c[2] + "\nTokenAnalyst error - " + error['message'] + "\n" + c[0])
+        print(c[2] + "\nTokenAnalyst error - " + error['message'] + c[0])
         await self.close()
         sys.exit(1)
 
