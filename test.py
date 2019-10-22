@@ -6,7 +6,7 @@ import TraderBot
 import BitMEX
 import TokenAnalyst
 import shutdown
-import KeyboardThread
+
 
 
 # export API keys in the environment variables, using $ export API_KEY='...'
