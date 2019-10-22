@@ -10,6 +10,7 @@ import datetime
 import base64
 import uuid
 import logging
+import bitmex_helpers
 
 
 # ANSI colors
@@ -33,6 +34,7 @@ class BitMEX:
         self._inflow_total = 0
         self._inflow_count = 0
         self._session = requests.Session()
+        #self._session.headers.update({'user-agent': 'trader-bot9000b'})
         self._session.headers.update({'content-type': 'application/json'})
         self._session.headers.update({'accept': 'application/json'})
         self.timeout = timeout
@@ -61,7 +63,7 @@ class BitMEX:
 
         endpoint = "order"
         # Generate a unique clOrdID with our prefix so we can identify it.
-        clOrdID = self._orderIDPrefix #+ base64.b64encode(uuid.uuid4().bytes).decode('utf8').rstrip('=\n')
+        clOrdID = self._orderIDPrefix + base64.b64encode(uuid.uuid4().bytes).decode('utf8').rstrip('=\n')
         postdict = {
             'symbol': self.symbol,
             'orderQty': quantity,
@@ -108,7 +110,7 @@ class BitMEX:
         }
         return await self._http_request(path=path, postdict=postdict, verb="DELETE")
 
-    # Work on this - does not work when verb = post, check BitMEX account auth too 
+
     async def _http_request(self, path, query=None, postdict=None, timeout=None, verb=None, rethrow_errors=False, max_retries=None):
         """Send a request to BitMEX Servers."""
         # Handle URL
@@ -126,9 +128,7 @@ class BitMEX:
             max_retries = 0 if verb in ['POST', 'PUT'] else 3
 
         # Create auth header for request
-        print(self._key, self._secret)
-        auth = BitmexHeaders(self._key, self._secret)
-        print(auth)
+        auth = bitmex_helpers.BitmexHeaders(self._key, self._secret)
 
         def exit_or_throw(e):
             if rethrow_errors:
@@ -263,7 +263,7 @@ class BitMEX:
         WS_ENDPOINT = "/realtime"
         EXPIRES = int(round(time.time()) + 100)
         uri = URL + ENDPOINT
-        signature = generate_signature(self._secret, VERB, ENDPOINT, EXPIRES)
+        signature = bitmex_helpers.generate_signature(self._secret, VERB, ENDPOINT, EXPIRES)
         id = "bitMEX_stream"
         payload = {"op": "authKeyExpires", "args": [self._key, EXPIRES, signature]}
         async with websockets.connect(uri) as websocket:
@@ -328,44 +328,4 @@ class BitMEX:
             return
     '''
 
-"""Taken from BitMEX market maker."""
-# Generates an API signature.
-# A signature is HMAC_SHA256(secret, verb + path + expires + data), hex encoded.
-# Verb must be uppercased, url is relative, expires must be an increasing 64-bit integer
-# and the data, if present, must be JSON without whitespace between keys.
-def generate_signature(apiSecret, verb, url, expires, postdict=None):
-    """Given an API Secret key and data, create a BitMEX-compatible signature."""
-    data = ''
-    if postdict:
-        # separators remove spaces from json
-        # BitMEX expects signatures from JSON built without spaces
-        data = json.dumps(str(postdict), separators=(',', ':'))
-    parsedURL = urllib.parse.urlparse(url)
-    path = parsedURL.path
-    if parsedURL.query:
-        path = path + '?' + parsedURL.query
-    
-    message = (verb + path + str(expires) + data).encode('utf-8')
 
-    signature = hmac.new(apiSecret.encode('utf-8'), message, digestmod=hashlib.sha256).hexdigest()
-    
-    return signature
-
-
-"""Taken from BitMEX market maker."""
-class BitmexHeaders:
-    """Attaches API Key Headers to requests."""
-
-    def __init__(self, key, secret):
-        self._key = key
-        self._secret = secret
-
-    def __call__(self, req):
-        """Generate API key headers."""
-        # modify and return the request
-        expires = int(round(time.time()) + 5)  # 5s grace period in case of clock skew
-        req.headers['api-expires'] = str(expires)
-        req.headers['api-key'] = self._key
-        req.headers['api-signature'] = generate_signature(self._secret, req.method, req.url, expires, req.body or '')
-
-        return req
