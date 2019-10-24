@@ -18,6 +18,7 @@ class TokenAnalyst:
         self._key = key
         self._ws = None
 
+
     async def connect(self):
         uri = "wss://ws.tokenanalyst.io"
         id = "token_analyst_stream"
@@ -35,7 +36,6 @@ class TokenAnalyst:
     async def close(self):
         await self._ws.close()
         print(c[3] + '\nTokenAnalyst connection closed' + c[0])
-
 
 
     async def interpret(self, response, id):

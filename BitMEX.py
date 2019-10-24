@@ -41,6 +41,7 @@ class BitMEX:
         self._orderIDPrefix = orderIDPrefex # cannot be longer than 13 chars long
         self.retries = 0 
 
+
     async def calc_inflow_average(self, new_value):
         """Calculates running average from token analys inflow data and prints the running average for every x inflows."""
         # set x to how many data points you want to average before it is printed
@@ -56,9 +57,9 @@ class BitMEX:
 
 
     # Code below is taken from BitMEX Market Maker and modified to fit this project
-    async def place_order(self, quantity, price):
+    async def place_order(self, quantity, price, side):
         """Place an order."""
-        if price < 0:
+        if price and price < 0:
             raise Exception("Price must be positive.")
 
         endpoint = "order"
@@ -67,24 +68,28 @@ class BitMEX:
         postdict = {
             'symbol': self.symbol,
             'orderQty': quantity,
-            'price': price,
-            'clOrdID': clOrdID
+            'clOrdID': clOrdID,
+            'side': side
         }
+        if(price): postdict.price = price
+
         return await self._http_request(path=endpoint, postdict=postdict, verb="POST")
 
 
-    async def buy(self, quantity, price):
+    async def buy(self, quantity, price=None):
         """Place a buy order.
         Returns order object. ID: orderID
         """
-        return await self.place_order(quantity, price)
+        side="Buy"
+        return await self.place_order(quantity, price, side)
 
     
-    async def sell(self, quantity, price):
+    async def sell(self, quantity, price=None):
         """Place a sell order.
         Returns order object. ID: orderID
         """
-        return await self.place_order(-quantity, price)
+        side="Sell"
+        return await self.place_order(quantity, price, side)
 
 
     async def get_orders(self):
@@ -100,6 +105,45 @@ class BitMEX:
         )
         # Only return orders that start with our clOrdID prefix.
         return [o for o in orders if str(o['clOrdID']).startswith(self._orderIDPrefix)]
+
+    
+    async def get_positions(self):
+        """Get current positions via HTTP."""
+        path = "position"
+        columns = ['lastPrice']
+        positions = await self._http_request(
+            path=path,
+            verb="GET",
+            query={
+                'columns':  ['unrealisedRoePcnt','timestamp','currentTimestamp','breakEvenPrice','markPrice','markValue','currentQty','avgEntryPrice','isOpen']
+            }
+
+        )
+        return positions
+
+
+    async def get_stats(self):
+        "Get exchange statistics via HTTP."
+        path = "stats"
+        stats = await self._http_request(
+            path=path,
+            verb="GET"
+        )
+        return stats
+
+
+    async def get_quote(self):
+        "Get best bid/offer snapshot."
+        path = "quote"
+        quote = await self._http_request(
+            path=path,
+            verb="GET",
+            query={
+                'symbol': 'XBT:nearest',
+                'count': 1
+            }
+        )
+        return quote
 
 
     async def cancel(self, orderID):
@@ -147,9 +191,8 @@ class BitMEX:
         try:
             logging.info("sending req to %s: %s" % (url, json.dumps(postdict or query or '')))
             req = requests.Request(method=verb, url=url, json=postdict, auth=auth, params=query)
-            print("req --------- ", req)
             prepped = self._session.prepare_request(req)
-            print("prepped-----------",prepped)
+            # send
             response = self._session.send(prepped, timeout=timeout)
             # Make non-200s throw
             response.raise_for_status()

@@ -13,11 +13,12 @@ c = (
 )
 
 class TraderBot:
-    def __init__(self, threshold, trade_amount):
+    def __init__(self, threshold):
         self._threshold = threshold
-        self._trade_amount = trade_amount
+        #self._sell_amount = sell_price
+        #self._buy_price
         self._token_analyst = None
-        self._exchanges = []
+        self._bitmex = None
         self._exchange_names = []
         self._init_stop = False
         
@@ -30,10 +31,8 @@ class TraderBot:
     def set_token_analyst(self, token_analyst):
         self._token_analyst = token_analyst
 
-    def set_exchanges(self, exchanges):
-        self._exchanges = copy.deepcopy(exchanges)
-        for e in exchanges:
-            self._exchange_names.append(e.name)
+    def set_bitmex(self, bitmex):
+        self._bitmex = bitmex
 
     def get_threshold(self):
         return self._threshold
@@ -52,18 +51,17 @@ class TraderBot:
         if self._token_analyst == None:
             return print(c[2] + "\nMust set token_analyst before call to start" + c[0])
 
-        if len(self._exchanges) < 1:
+        if self._bitmex == None:
             return print(c[2] + "\nMust set an exchange before call to start" + c[0])
 
         ''' Connect to exhange websockets in future - Right now only Bitmex REST API
         asyncio.gather(self.connect_to_token_analyst(), self.connect_to_exchanges())
         '''
-        # 
-        await self.token_analyst_stream()
+        await self._main_loop()
 
 
-    async def token_analyst_stream(self):
-        """Inits connection to Token Analyst websocket stream and send inflows to be analyzed."""
+    async def _main_loop(self):
+        """Inits connection to Token Analyst websocket stream, sends inflows to be analyzed, trades basiced off analysis and current positions."""
         async for data in self._token_analyst.connect():
             if(self._init_stop):
                 await self._token_analyst.close()
@@ -71,31 +69,43 @@ class TraderBot:
             if(data == None):
                 continue
             # if data sent from token analyst is an Inflow and its in one of our exchanges dive deeper
-            elif(data['flowType'] == 'Inflow' and data['to'][0] in self._exchange_names):
-                await self.analyze_inflow_data(data)
-                continue
+            elif(data['flowType'] == 'Inflow' and data['to'][0] == 'Bitmex'):
+                result = await self.analyze_inflow_data(data)
+                
+                if not result:
+                    continue
+                
+                hasPosition = await self.check_positions()
+
+                if hasPosition:
+                    # sell
+                    self._bitmex.sell(1)
+                else:
+                    #short
+                    self._bitmex.buy(1)
+                
 
 
     async def analyze_inflow_data(self, data):
         """Analyzes if the inflow value is above threshold. Also sends data to exchange for calculating average inflow."""
         
-        await self._exchanges[self._exchange_names.index(str(data['to'][0]))].calc_inflow_average(data['value'])
+        await self._bitmex.calc_inflow_average(data['value'])
 
         if(data['value'] > self._threshold):
             print(c[3] + f"\n{data['to']} Inflow above threshold - {self._threshold}. Value - {data['value']}" + c[0])
-            await self.check_orders(data)
-            
-
-    async def check_orders(self, data):
-        orders = await self._exchanges[self._exchange_names.index(str(data['to'][0]))].get_orders()
-        if(orders):
-            # You have trades open, sell if long
-            orderID = await self._exchanges[self._exchange_names.index(str(data['to'][0]))].sell(1,self._trade_amount)
-            print(orderID)
+            return True
         else:
-            # No trades open, open short 
-            orderID = await self._exchanges[self._exchange_names.index(str(data['to'][0]))].buy(1,self._trade_amount)
-            print(orderID)
+            return False  
+
+
+    async def check_positions(self):
+        positions = await self._bitmex.get_positions()
+        if(positions[0]['isOpen']):
+            return True
+        else:
+            return False
+        
+
 
     #For now use http but in future this will connect to exchange websockets
     async def connect_to_exchanges(self):
