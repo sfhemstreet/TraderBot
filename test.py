@@ -16,12 +16,13 @@ BITMEX_API_SECRET = os.environ['BITMEX_API_SECRET']
 
 # set Inflow threshold and amount for each trade 
 THRESHOLD = 0
-AMOUNT = 1
+SELL_AMOUNT = 0
+BUY_AMOUNT = 0
 
 def main():
 
     # create a TraderBot with threshold, amount
-    bot = TraderBot.TraderBot(THRESHOLD, AMOUNT)
+    bot = TraderBot.TraderBot(THRESHOLD)
 
     # create TokenAnalyst with api key / create BitMEX with key and secret
     ta = TokenAnalyst.TokenAnalyst(TOKEN_ANALYST_API_KEY)
@@ -30,7 +31,7 @@ def main():
     # set token_analyst  
     bot.set_token_analyst(ta)
     # set exhanges - currently only excepts BitMEX tuple 
-    bot.set_exchanges([bm])
+    bot.set_bitmex(bm)
     
     # create event loop
     loop = asyncio.get_event_loop() 
