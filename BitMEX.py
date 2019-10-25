@@ -39,11 +39,14 @@ class BitMEX:
         self._session.headers.update({'accept': 'application/json'})
         self.timeout = timeout
         self._orderIDPrefix = orderIDPrefex # cannot be longer than 13 chars long
+        self._short_positions = []
+        self._sell_orders = []
         self.retries = 0 
 
 
     async def calc_inflow_average(self, new_value):
-        """Calculates running average from token analys inflow data and prints the running average for every x inflows."""
+        """Calculates running average from token analys inflow 
+        data and prints the running average for every x inflows."""
         # set x to how many data points you want to average before it is printed
         x = 20
         self._inflow_count = self._inflow_count + 1
@@ -76,20 +79,26 @@ class BitMEX:
         return await self._http_request(path=endpoint, postdict=postdict, verb="POST")
 
 
-    async def buy(self, quantity, price=None):
+    async def short(self, quantity, price=None):
         """Place a buy order.
         Returns order object. ID: orderID
         """
         side="Buy"
-        return await self.place_order(quantity, price, side)
-
+        short_info = await self.place_order(quantity, price, side)
+        #print(short_info)
+        self._short_positions.append(short_info)
+        return short_info
     
+
     async def sell(self, quantity, price=None):
         """Place a sell order.
         Returns order object. ID: orderID
         """
         side="Sell"
-        return await self.place_order(quantity, price, side)
+        sell_info = await self.place_order(quantity, price, side)
+        #print(sell_info)
+        self._sell_orders.append(sell_info)
+        return sell_info
 
 
     async def get_orders(self):
@@ -115,9 +124,11 @@ class BitMEX:
             path=path,
             verb="GET",
             query={
-                'columns':  ['unrealisedRoePcnt','timestamp','currentTimestamp','breakEvenPrice','markPrice','markValue','currentQty','avgEntryPrice','isOpen']
+                'columns': ['unrealisedRoePcnt','timestamp',
+                            'currentTimestamp','breakEvenPrice',
+                            'markPrice','markValue','currentQty',
+                            'avgEntryPrice','isOpen']
             }
-
         )
         return positions
 
@@ -144,6 +155,20 @@ class BitMEX:
             }
         )
         return quote
+
+
+    async def get_last_xbt_price(self):
+        "Get last trade price of XBT."
+        path = "trade"
+        price = await self._http_request(
+            path=path,
+            query={
+                'symbol':'XBT',
+                'count': 1,
+                'reverse': True
+            }
+        )
+        return price['price']
 
 
     async def cancel(self, orderID):
