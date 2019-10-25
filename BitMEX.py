@@ -321,7 +321,7 @@ class BitMEX:
 
         return response.json()
 
-    '''
+    
     # Following code is for websocket connection - 
     async def connect(self):
         # used to create signature for auth connection 
@@ -330,8 +330,8 @@ class BitMEX:
         WS_VERB = "GET"
         WS_ENDPOINT = "/realtime"
         EXPIRES = int(round(time.time()) + 100)
-        uri = URL + ENDPOINT
-        signature = bitmex_helpers.generate_signature(self._secret, VERB, ENDPOINT, EXPIRES)
+        uri = WS_URL + WS_ENDPOINT
+        signature = bitmex_helpers.generate_signature(self._secret, WS_VERB, WS_ENDPOINT, EXPIRES)
         id = "bitMEX_stream"
         payload = {"op": "authKeyExpires", "args": [self._key, EXPIRES, signature]}
         async with websockets.connect(uri) as websocket:
@@ -349,6 +349,7 @@ class BitMEX:
             await self.interpret(json.loads(msg),id)
         return
 
+    '''
     async def interpret(self, response, id):
         if 'info' in response:
             print(c[1] + f"\n{response['info']} Limit : {response['limit']}" + c[0])
@@ -364,8 +365,8 @@ class BitMEX:
             return
         else:
             return
-
-
+    '''
+    '''
     async def get_table_info(self, data):
         """Prints bitrmex user table data on Position, Wallet, Margin, and Order."""
         if(data['table'] == 'position'):

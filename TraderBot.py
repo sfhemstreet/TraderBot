@@ -21,18 +21,19 @@ class TraderBot:
         self._bitmex = None
         self._exchange_names = []
         self._init_stop = False
+        self._event_loop = None
         
     def set_threshold(self, threshold):
         self._threshold = threshold
-
-    def set_trade_amount(self, trade_amount):
-        self._trade_amount = trade_amount
 
     def set_token_analyst(self, token_analyst):
         self._token_analyst = token_analyst
 
     def set_bitmex(self, bitmex):
         self._bitmex = bitmex
+
+    def set_event_loop(self, loop):
+        self._event_loop = loop
 
     def get_threshold(self):
         return self._threshold
@@ -61,7 +62,8 @@ class TraderBot:
 
 
     async def _main_loop(self):
-        """Inits connection to Token Analyst websocket stream, sends inflows to be analyzed, trades basiced off analysis and current positions."""
+        """Inits connection to Token Analyst websocket stream, sends inflows to be analyzed, trades basiced off analysis and current positions."""    
+
         async for data in self._token_analyst.connect():
             if(self._init_stop):
                 await self._token_analyst.close()
@@ -79,12 +81,22 @@ class TraderBot:
 
                 if hasPosition:
                     # sell
-                    await self._bitmex.sell(1)
+                    await self.init_sell()
                 else:
                     #short
-                    await self._bitmex.buy(1)
+                    await self.init_short()
                   
-                
+
+    async def init_sell(self):
+        # in future place limit order by supplying price
+        # right now just sells at market 
+        await self._bitmex.sell(1)
+
+
+    async def init_short(self):
+        curr_price = await self._bitmex.get_last_xbt_price()
+        short_price = curr_price - 200
+        await self._bitmex.short(1, short_price)
 
 
     async def analyze_inflow_data(self, data):

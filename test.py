@@ -15,9 +15,8 @@ BITMEX_API_KEY = os.environ['BITMEX_API_KEY']
 BITMEX_API_SECRET = os.environ['BITMEX_API_SECRET']
 
 # set Inflow threshold and amount for each trade 
-THRESHOLD = 0
-SELL_AMOUNT = 0
-BUY_AMOUNT = 0
+THRESHOLD = 100
+
 
 def main():
 
@@ -35,6 +34,7 @@ def main():
     
     # create event loop
     loop = asyncio.get_event_loop() 
+    
 
     '''
     # Error Handling - work on this to cancel all trades, shutdown bot 

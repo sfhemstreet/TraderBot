@@ -14,12 +14,14 @@ c = (
 )
 
 class TokenAnalyst:
+    """Connects to Token Analyst websocket and yields Inflow data thru the connect method."""
     def __init__(self, key):
         self._key = key
         self._ws = None
 
 
     async def connect(self):
+        """Connects to websocket and yields inflow data."""
         uri = "wss://ws.tokenanalyst.io"
         id = "token_analyst_stream"
         channel = "btc_unconfirmed_exchange_flows"
@@ -39,6 +41,7 @@ class TokenAnalyst:
 
 
     async def interpret(self, response, id):
+        """Interpret data to check for heartbeat, connection success / errors, and Inflow."""
         if(response['id'] == id and response['event'] == "data"):
             return await self.on_data(response['data'])
         if(response['id'] == None and response['event'] == "heartbeat"):
