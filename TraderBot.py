@@ -79,10 +79,11 @@ class TraderBot:
 
                 if hasPosition:
                     # sell
-                    self._bitmex.sell(1)
+                    await self._bitmex.sell(1)
                 else:
                     #short
-                    self._bitmex.buy(1)
+                    await self._bitmex.buy(1)
+                  
                 
 
 
@@ -104,7 +105,6 @@ class TraderBot:
             return True
         else:
             return False
-        
 
 
     #For now use http but in future this will connect to exchange websockets
