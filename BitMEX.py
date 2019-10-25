@@ -74,7 +74,7 @@ class BitMEX:
             'clOrdID': clOrdID,
             'side': side
         }
-        if(price): postdict.price = price
+        if(price): postdict['price'] = price
 
         return await self._http_request(path=endpoint, postdict=postdict, verb="POST")
 
@@ -157,10 +157,10 @@ class BitMEX:
         return quote
 
 
-    async def get_last_xbt_price(self):
+    async def get_last_xbt_trade(self):
         "Get last trade price of XBT."
         path = "trade"
-        price = await self._http_request(
+        trade = await self._http_request(
             path=path,
             query={
                 'symbol':'XBT',
@@ -168,7 +168,7 @@ class BitMEX:
                 'reverse': True
             }
         )
-        return price['price']
+        return trade[0]
 
 
     async def cancel(self, orderID):

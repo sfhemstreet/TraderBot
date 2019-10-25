@@ -20,7 +20,7 @@ THRESHOLD = 100
 
 def main():
 
-    # create a TraderBot with threshold, amount
+    # create a TraderBot with threshold
     bot = TraderBot.TraderBot(THRESHOLD)
 
     # create TokenAnalyst with api key / create BitMEX with key and secret
@@ -29,13 +29,13 @@ def main():
 
     # set token_analyst  
     bot.set_token_analyst(ta)
-    # set exhanges - currently only excepts BitMEX tuple 
+
+    # set bitmex exhange
     bot.set_bitmex(bm)
     
     # create event loop
     loop = asyncio.get_event_loop() 
     
-
     '''
     # Error Handling - work on this to cancel all trades, shutdown bot 
     # May want to catch other signals too
@@ -46,15 +46,18 @@ def main():
 
     try:
         loop.create_task(bot.start())
-        #loop.create_task(do_after_delay(5, bot.stop))
+        # to stop bot after running for set time uncomment following 2 lines 
+        #stop_time = 200000
+        #loop.create_task(do_this_after_delay(stop_time, bot.stop))
         loop.run_forever()
     finally:
         loop.close() 
 
 
-async def do_after_delay(delay, what):
-        await asyncio.sleep(delay)
-        await what()
+async def do_this_after_delay(delay, do_this):
+    '''Executes function 'do_this' after non-block sleeping the 'delay' time.'''
+    await asyncio.sleep(delay)
+    await do_this()
 
 
 if __name__ == "__main__":

@@ -94,10 +94,11 @@ class TraderBot:
 
 
     async def init_short(self):
-        curr_price = await self._bitmex.get_last_xbt_price()
-        short_price = curr_price - 200
+        trade = await self._bitmex.get_last_xbt_trade()
+        curr_price = trade['price']
+        short_price = curr_price - 50
         await self._bitmex.short(1, short_price)
-
+        
 
     async def analyze_inflow_data(self, data):
         """Analyzes if the inflow value is above threshold. Also sends data to exchange for calculating average inflow."""
