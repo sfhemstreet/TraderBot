@@ -14,7 +14,7 @@ TOKEN_ANALYST_API_KEY = os.environ['TOKEN_ANALYST_API_KEY']
 BITMEX_API_KEY = os.environ['BITMEX_API_KEY']
 BITMEX_API_SECRET = os.environ['BITMEX_API_SECRET']
 
-# set Inflow threshold and amount for each trade 
+# set Inflow threshold 
 THRESHOLD = 100
 
 

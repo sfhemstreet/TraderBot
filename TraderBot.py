@@ -88,12 +88,15 @@ class TraderBot:
                   
 
     async def init_sell(self):
-        # in future place limit order by supplying price
-        # right now just sells at market 
-        await self._bitmex.sell(1)
+        # place limit order 
+        trade = await self._bitmex.get_last_xbt_trade()
+        curr_price = trade['price']
+        limit_price = curr_price - 50
+        await self._bitmex.sell(1, limit_price)
 
 
     async def init_short(self):
+        # open short position
         trade = await self._bitmex.get_last_xbt_trade()
         curr_price = trade['price']
         short_price = curr_price - 50
