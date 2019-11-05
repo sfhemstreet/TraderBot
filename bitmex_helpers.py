@@ -10,7 +10,7 @@ import requests
 # A signature is HMAC_SHA256(secret, verb + path + expires + data), hex encoded.
 # Verb must be uppercased, url is relative, expires must be an increasing 64-bit integer
 # and the data, if present, must be JSON without whitespace between keys.
-def generate_signature(secret, verb, url, nonce, data):
+def generate_signature(secret, verb, url, nonce, data=''):
     """Generate a request signature compatible with BitMEX."""
     # Parse the url so we can remove the base and extract just the path.
     parsedURL = urllib.parse.urlparse(url)

@@ -1,10 +1,21 @@
 import asyncio
 import os
-import json
-import sys
-import copy
 
-# ANSI colors
+from BitMEX import BitMEX
+from TokenAnalyst import TokenAnalyst
+
+# export API keys in the environment variables, using $ export KEY_NAME='...'
+TOKEN_ANALYST_API_KEY = os.environ['TOKEN_ANALYST_API_KEY']
+BITMEX_API_KEY =        os.environ['BITMEX_API_KEY']
+BITMEX_API_SECRET =     os.environ['BITMEX_API_SECRET']
+
+# set Inflow threshold to base trades off of (float > 0)
+G_THRESHOLD = None
+
+# set percentage of portfolio (bitmex wallet) available to with trade (float > 0 and < 1)
+G_PORTFOLIO_PERCENTAGE = None
+
+# color output :P
 c = (
     "\033[0m",   # End of color
     "\033[36m",  # Cyan
@@ -12,120 +23,143 @@ c = (
     "\033[35m",  # Magenta
 )
 
-class TraderBot:
-    def __init__(self, threshold):
-        self._threshold = threshold
-        #self._sell_amount = sell_price
-        #self._buy_price
-        self._token_analyst = None
-        self._bitmex = None
-        self._exchange_names = []
-        self._init_stop = False
-        self._event_loop = None
+            
+def main():
+    # create asyncio event loop
+    loop = asyncio.get_event_loop() 
+
+    # init TokenAnalyst with api-key
+    token = TokenAnalyst(TOKEN_ANALYST_API_KEY)
+
+    # init BitMEX with api-key and secret (supply 'base_url' to do real trades, default is testnet url) 
+    bitmex = BitMEX(key=BITMEX_API_KEY, secret=BITMEX_API_SECRET)
+
+    
+    # User Input Only If G_THRESHOLD / G_PORTFOLIO_PERCENTAGE Aren't Filled In 
+    #----------------------------------------------------------------------
+    # get user input to set THRESHOLD if not declared globally (float > 0)
+    if G_THRESHOLD == None:
+        THRESHOLD = float(input(c[3] + 
+        '''\nEnter Token Analyst INFLOW value threshold.\n~ Must be a number greater than 0 ~
+        \n>>> ''' + c[0]))
+    else:
+        THRESHOLD = G_THRESHOLD
         
-    def set_threshold(self, threshold):
-        self._threshold = threshold
+    if THRESHOLD <= 0:
+        raise Exception(c[2] + "\nTHRESHOLD MUST BE ABOVE 0\n" + c[0])
 
-    def set_token_analyst(self, token_analyst):
-        self._token_analyst = token_analyst
+    # get user input to set percentage of portfolio available 
+    # to trade with if not declared globally (float > 0 and < 1)
+    if G_PORTFOLIO_PERCENTAGE == None:
+        PORTFOLIO_PERCENTAGE = float(input(c[3] + 
+        '''\nEnter percentage of portfolio available to trade with.\n~ Must be a number greater than 0 and less than 1 ~
+        \n>>> ''' + c[0]))
+    else:
+        PORTFOLIO_PERCENTAGE = G_PORTFOLIO_PERCENTAGE
+        
+    if PORTFOLIO_PERCENTAGE <= 0 or PORTFOLIO_PERCENTAGE >= 1:
+        raise Exception(c[2] + "\nPORTFOLIO PERCENTAGE MUST BE ABOVE 0 AND BELOW 1\n" + c[0])
+    #-----------------------------------------------------------------------
 
-    def set_bitmex(self, bitmex):
-        self._bitmex = bitmex
 
-    def set_event_loop(self, loop):
-        self._event_loop = loop
+    # WORK ON THIS
+    async def stop_limit_order(quantity, trading_price):
+        """Calculate limit price and send to bitmex to sell."""
+        # if price drops 10 below the current trading price sell
+        limit_price = trading_price + 10
+        stop_price = trading_price - 10
 
-    def get_threshold(self):
-        return self._threshold
+        print(c[3] + f"\nStop limit order.\nQuanitity - {quantity}, Price - {limit_price}, Stop Price - {stop_price}\n" + c[0])
+
+        await bitmex.sell(quantity=quantity, price=limit_price, stop_price=stop_price)
 
 
-    async def stop(self):
-        """Turns off all connections to TraderBot."""
-        if self._token_analyst == None:
-            return print(c[2] + "\nThere is no stream... must set_token_analyst and run start_stream to use stop_stream." + c[0])
-        self._init_stop = True
+    # WORK ON THIS
+    async def open_short(trading_price, amount):
+        """Calculate short amount and send to bitmex to open short."""
+        # This is wrong. Fix this. 
+        # It is the amount you are willing to lose 
+        # if the price goes up when betting that it will go down
+        #stop_price = trading_price + amount
+        quantity = 1
+        # fix this too plz
+        short_price = trading_price - 100
+
+        print(c[3] + f"\nOpening short.\nQuanitity - {quantity}, Price - {short_price}\n" + c[0])
+
+        await bitmex.short(quantity=quantity, price=short_price) # , stop_price=stop_price)
     
-    
-    async def start(self):
-        """Tells Token Analyst to start streaming websocket, which yields inflow data."""
 
-        if self._token_analyst == None:
-            return print(c[2] + "\nMust set token_analyst before call to start" + c[0])
+    # WORK ON THIS
+    async def init_trade():
+        """Starts trade procedure by checking wallet, 
+        positions, and trading price."""
+        # get current positions, wallet amount, and trading price on Bitmex 
+        positions = await bitmex.get_position_data()
+        wallet_amount = await bitmex.get_wallet_amount()
+        trading_price = await bitmex.get_trading_price()
 
-        if self._bitmex == None:
-            return print(c[2] + "\nMust set an exchange before call to start" + c[0])
+        # calc trade amount based on percentage of portfolio available to trade
+        trade_amount = PORTFOLIO_PERCENTAGE * wallet_amount
 
-        ''' Connect to exhange websockets in future - Right now only Bitmex REST API
-        asyncio.gather(self.connect_to_token_analyst(), self.connect_to_exchanges())
-        '''
-        await self._main_loop()
+        # if we have positions open we want to sell / open a short position
+        # if we dont have any positions open, just open a short position
+        if positions['open']:
+            # sell and short
+            quantity = len(positions['open'])
+            await stop_limit_order(quantity, trading_price)
+            await open_short(trading_price, trade_amount)
+        else:
+            # short
+            await open_short(trading_price, trade_amount)
 
+        
+    async def check_for_inflow(data):
+        """Check if data is an Inflow event to our exchange, 
+        Collect average inflow, and see if Inflow is above threshold."""
 
-    async def _main_loop(self):
-        """Inits connection to Token Analyst websocket stream, sends inflows to be analyzed, trades basiced off analysis and current positions."""    
+        if(data['flowType'] == 'Inflow' and data['to'][0] == 'Bitmex'):
+            # collect running average Inflow 
+            await bitmex.calc_inflow_average(data['value'])
+            
+            # check if Inflow is above threshold
+            if(data['value'] > THRESHOLD):
+                print(c[3] + f"\n{data['to']} Inflow above threshold - {THRESHOLD}. Value - {data['value']}" + c[0])
+                # start trade 
+                await init_trade()
+                
 
-        async for data in self._token_analyst.connect():
-            if(self._init_stop):
-                await self._token_analyst.close()
-                return
+    # Websocket loop for streaming Token Analyst Inflow data and executing trades
+    async def token_analyst_ws_loop():
+        """Recv inflow data from Token Analyst websocket."""
+        async for data in token.connect():
             if(data == None):
                 continue
-            # if data sent from token analyst is an Inflow and its in one of our exchanges dive deeper
-            elif(data['flowType'] == 'Inflow' and data['to'][0] == 'Bitmex'):
-                result = await self.analyze_inflow_data(data)
-                
-                if not result:
-                    continue
-                
-                hasPosition = await self.check_positions()
+            else:
+                await check_for_inflow(data)
+          
 
-                if hasPosition:
-                    # sell
-                    await self.init_sell()
-                else:
-                    #short
-                    await self.init_short()
-                  
-
-    async def init_sell(self):
-        # place limit order 
-        trade = await self._bitmex.get_last_xbt_trade()
-        curr_price = trade['price']
-        limit_price = curr_price - 50
-        await self._bitmex.sell(1, limit_price)
-
-
-    async def init_short(self):
-        # open short position
-        trade = await self._bitmex.get_last_xbt_trade()
-        curr_price = trade['price']
-        short_price = curr_price - 50
-        await self._bitmex.short(1, short_price)
+    # Websocket Loop for streaming Bitmex data
+    async def bitmex_ws_loop():
+        """Connect to bitmex websocket to get updates on market and user data."""
+        await bitmex.connect()
         
-
-    async def analyze_inflow_data(self, data):
-        """Analyzes if the inflow value is above threshold. Also sends data to exchange for calculating average inflow."""
-        
-        await self._bitmex.calc_inflow_average(data['value'])
-
-        if(data['value'] > self._threshold):
-            print(c[3] + f"\n{data['to']} Inflow above threshold - {self._threshold}. Value - {data['value']}" + c[0])
-            return True
-        else:
-            return False  
-
-
-    async def check_positions(self):
-        positions = await self._bitmex.get_positions()
-        if(positions[0]['isOpen']):
-            return True
-        else:
-            return False
-
-
-    #For now use http but in future this will connect to exchange websockets
-    async def connect_to_exchanges(self):
-        """Init connections to all exchanges."""
-        for e in self._exchanges:
-            await e.connect()   
     
+    try:
+        # Create tasks for both websockets 
+        loop.create_task(bitmex_ws_loop())
+        loop.create_task(token_analyst_ws_loop())
+        # RUN 
+        loop.run_forever()
+    finally:
+        loop.close() 
+
+
+async def do_this_after_delay(delay, do_this):
+    '''Executes function 'do_this' after non-block sleeping the 'delay' time.'''
+    await asyncio.sleep(delay)
+    await do_this()
+
+
+if __name__ == "__main__":
+    main()

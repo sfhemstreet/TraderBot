@@ -21,6 +21,11 @@ c = (
     "\033[35m",  # Magenta
 )
 
+# ws_url is set to testnet, change to make real trades 
+WS_URL = "wss://testnet.bitmex.com"
+WS_VERB = "GET"
+WS_ENDPOINT = "/realtime"
+
 
 class BitMEX:
     def __init__(self, key, secret, symbol="XBTUSD", orderIDPrefex="mm_bitmex_", base_url="https://testnet.bitmex.com/api/v1/", timeout=8):
@@ -42,6 +47,12 @@ class BitMEX:
         self._short_positions = []
         self._sell_orders = []
         self.retries = 0 
+        # user / trade data
+        self.wallet_data = None
+        self.position_data = None
+        self.margin_data = None
+        self.order_data = None
+        self.trade_data = None
 
 
     async def calc_inflow_average(self, new_value):
@@ -56,14 +67,139 @@ class BitMEX:
         if(self._inflow_count % x == 0):
             print(c[1] + f"\nCurrent inflow average is {round(self._inflow_average,4)}" + c[0])
 
-        return
+
+    # getters for Bitmex Data stored from websocket stream
+    async def get_position_data(self):
+        """Get position data and return it as an object organized into closed and open positions."""
+        pos_data = {
+            'closed': [],
+            'open': []
+        }
+        for p in self.position_data:
+            if 'isOpen' in p == False:
+                pos_data['closed'].append(p)
+            else:
+                pos_data['open'].append(p)
+        
+        return pos_data
+        
+
+    async def get_wallet_amount(self):
+        """Returns amount available in wallet."""
+        return self.wallet_data[0]['amount']
 
 
+    async def get_margin_data(self):
+        """Returns last stroed margin data."""
+        return self.margin_data[0]
+
+
+    async def get_order_data(self):
+        # NOT IN USE YET
+        print("ORD")
+        print(self.order_data)
+
+
+    async def get_trading_price(self):
+        """Return price from last trade stored from websocket."""
+        return self.trade_data[0]['price']
+
+
+    # WEBSOCKETS
+    # Following code is for websocket connection - 
+    async def connect(self):
+        """Connects to Bitmex websocket."""
+        EXPIRES = int(round(time.time()) + 100)
+        uri = WS_URL + WS_ENDPOINT
+        signature = bitmex_helpers.generate_signature(self._secret, WS_VERB, WS_ENDPOINT, EXPIRES)
+        id = "bitMEX_stream"
+        payload = {"op": "authKeyExpires", "args": [self._key, EXPIRES, signature]}
+        async with websockets.connect(uri) as websocket:
+            self._ws = websocket
+            await websocket.send(json.dumps(payload))
+            async for msg in websocket: 
+                msg_type = await self.interpret_msg_type(json.loads(msg),id)
+                if msg_type == 'INFO':
+                    pass
+                elif msg_type == 'SUCCESS':
+                    await self.get_all_info() 
+                elif msg_type == 'ERROR':
+                    raise Exception(c[2] + "\nERROR CONNECTING TO BITMEX WEBSOCKET" + c[0])
+                    return
+
+
+    async def get_all_info(self):
+        """Gets position, margin, order, wallet, and trade data via websocket."""
+        args = ["position","margin","wallet","order","trade:XBTUSD"]
+        await self.ws_subscribe(args)
+       
+
+    async def ws_subscribe(self, args):
+        """Subscribes to data on bitmex websocket. Takes in array of args for what to subscribe to."""
+        payload = {"op": "subscribe", "args": args}
+        id = "bitMEX_stream"
+        await self._ws.send(json.dumps(payload))
+        async for msg in self._ws:
+            msg_type = await self.interpret_msg_type(json.loads(msg),id)
+            if msg_type == 'INFO':
+                pass
+            elif msg_type == 'SUCCESS':
+                pass
+            elif msg_type == 'ERROR':
+                raise Exception(c[2] + "\nERROR SUBSCRIBING TO BITMEX WEBSOCKET" + c[0])
+            elif msg_type == 'TABLE':
+                await self.store_table_info(msg)
+
+    
+    async def interpret_msg_type(self, response, id):
+        """Gets response from websocket and returns type of response, ie table, info, success, error."""
+        if 'info' in response:
+            print(c[1] + f"\n{response['info']} Limit : {response['limit']}" + c[0]) 
+            return 'INFO'
+        elif 'success' in response:
+            if 'subscribe' in response:
+                print(c[1] + f"\nBitMEX websocket successfully subscribed to {response['subscribe']}" + c[0])
+            return 'SUCCESS'
+        elif 'error' in response:
+            print(c[2] + f"\n{response}" + c[0])
+            return 'ERROR'
+        elif 'table' in response:
+            return 'TABLE'
+        
+
+    async def store_table_info(self, raw_data):
+        """Stores bitmex table data on Position, Wallet, Margin, Order, and Trade."""
+        data = json.loads(raw_data)
+        if(data['table'] == 'position'):
+            if(data['data']):
+                self.position_data = data['data']
+
+        elif(data['table'] == 'wallet'):
+            self.wallet_data = data['data']
+
+        elif(data['table'] == 'margin'):
+            if(data['data']):
+                self.margin_data = data['data']
+
+        elif(data['table'] == 'order'):
+            if(data['data']):
+                self.order_data = data['data']
+
+        elif(data['table'] == 'trade'):
+            if(data['data']):
+                self.trade_data = data['data']
+
+
+
+    # REST API 
     # Code below is taken from BitMEX Market Maker and modified to fit this project
-    async def place_order(self, quantity, price, side):
-        """Place an order."""
+    async def place_order(self, quantity, price=None, side=None, stop_price=None):
+        """Place an order via REST API."""
         if price and price < 0:
-            raise Exception("Price must be positive.")
+            raise Exception(c[2] + "Order Price must be positive." + c[0])
+
+        if not quantity:
+            raise Exception(c[2] + "Must supply order quantity." + c[0])
 
         endpoint = "order"
         # Generate a unique clOrdID with our prefix so we can identify it.
@@ -75,104 +211,45 @@ class BitMEX:
             'side': side
         }
         if(price): postdict['price'] = price
+        if(stop_price): postdict['stopPx'] = stop_price
 
         return await self._http_request(path=endpoint, postdict=postdict, verb="POST")
 
 
-    async def short(self, quantity, price=None):
+    async def short(self, quantity, price=None, stop_price=None):
         """Place a buy order.
         Returns order object. ID: orderID
         """
         side="Buy"
-        short_info = await self.place_order(quantity, price, side)
+        short_info = await self.place_order(
+            quantity=quantity, 
+            price=price,
+            side=side, 
+            stop_price=stop_price
+        )
         #print(short_info)
         self._short_positions.append(short_info)
         return short_info
     
 
-    async def sell(self, quantity, price=None):
+    async def sell(self, quantity, price=None, stop_price=None):
         """Place a sell order.
         Returns order object. ID: orderID
         """
         side="Sell"
-        sell_info = await self.place_order(quantity, price, side)
+        sell_info = await self.place_order(
+            quantity=quantity, 
+            price=price, 
+            side=side,
+            stop_price=stop_price
+        )
         #print(sell_info)
         self._sell_orders.append(sell_info)
         return sell_info
 
 
-    async def get_orders(self):
-        """Get open orders via HTTP."""
-        path = "order"
-        orders = await self._http_request(
-            path=path,
-            query={
-                'filter': json.dumps({'ordStatus.isTerminated': False, 'symbol': self.symbol}),
-                'count': 500
-            },
-            verb="GET"
-        )
-        # Only return orders that start with our clOrdID prefix.
-        return [o for o in orders if str(o['clOrdID']).startswith(self._orderIDPrefix)]
-
-    
-    async def get_positions(self):
-        """Get current positions via HTTP."""
-        path = "position"
-        columns = ['lastPrice']
-        positions = await self._http_request(
-            path=path,
-            verb="GET",
-            query={
-                'columns': ['unrealisedRoePcnt','timestamp',
-                            'currentTimestamp','breakEvenPrice',
-                            'markPrice','markValue','currentQty',
-                            'avgEntryPrice','isOpen']
-            }
-        )
-        return positions
-
-
-    async def get_stats(self):
-        "Get exchange statistics via HTTP."
-        path = "stats"
-        stats = await self._http_request(
-            path=path,
-            verb="GET"
-        )
-        return stats
-
-
-    async def get_quote(self):
-        "Get best bid/offer snapshot."
-        path = "quote"
-        quote = await self._http_request(
-            path=path,
-            verb="GET",
-            query={
-                'symbol': 'XBT:nearest',
-                'count': 1
-            }
-        )
-        return quote
-
-
-    async def get_last_xbt_trade(self):
-        "Get last trade price of XBT."
-        path = "trade"
-        trade = await self._http_request(
-            path=path,
-            query={
-                'symbol':'XBT',
-                'count': 1,
-                'reverse': True
-            }
-        )
-        return trade[0]
-
-
     async def cancel(self, orderID):
-        """Cancel an existing order."""
+        """Cancel an existing order by submitting order ID."""
         path = "order"
         postdict = {
             'orderID': orderID,
@@ -263,7 +340,7 @@ class BitMEX:
                 asyncio.sleep(to_sleep)
 
                 # Retry the request.
-                return retry()
+                return await retry()
 
             # 503 - BitMEX temporary downtime, likely due to a deploy. Try again
             elif response.status_code == 503:
@@ -321,80 +398,97 @@ class BitMEX:
 
         return response.json()
 
+
+    ''' REST API requests. Not needed with use of websockets 
+     async def get_orders_rest(self):
+        """Get open orders via REST API http."""
+        path = "order"
+        orders = await self._http_request(
+            path=path,
+            query={
+                'filter': json.dumps({'ordStatus.isTerminated': False, 'symbol': self.symbol}),
+                'count': 500
+            },
+            verb="GET"
+        )
+        # Only return orders that start with our clOrdID prefix.
+        return [o for o in orders if str(o['clOrdID']).startswith(self._orderIDPrefix)]
+
+
+    async def get_orders(self):
+        """Get orders via websocket."""
+        arg = ["order"]
+        self.ws_subscribe(arg)
+
     
-    # Following code is for websocket connection - 
-    async def connect(self):
-        # used to create signature for auth connection 
-        # default URL is testnet, change URL for real trading
-        WS_URL = "wss://testnet.bitmex.com"
-        WS_VERB = "GET"
-        WS_ENDPOINT = "/realtime"
-        EXPIRES = int(round(time.time()) + 100)
-        uri = WS_URL + WS_ENDPOINT
-        signature = bitmex_helpers.generate_signature(self._secret, WS_VERB, WS_ENDPOINT, EXPIRES)
-        id = "bitMEX_stream"
-        payload = {"op": "authKeyExpires", "args": [self._key, EXPIRES, signature]}
-        async with websockets.connect(uri) as websocket:
-            self._ws = websocket
-            await websocket.send(json.dumps(payload))
-            async for msg in websocket: 
-                await self.interpret(json.loads(msg), id)
-            return
-       
-    async def exchange_user_data(self):
-        payload = {"op": "subscribe", "args": ["order","margin","position","wallet"]}
-        id = "bitMEX_stream"
-        await self._ws.send(json.dumps(payload))
-        async for msg in self._ws:
-            await self.interpret(json.loads(msg),id)
-        return
-
-    '''
-    async def interpret(self, response, id):
-        if 'info' in response:
-            print(c[1] + f"\n{response['info']} Limit : {response['limit']}" + c[0])
-            return 
-        elif 'success' in response:
-            print()
-            return 
-        elif 'error' in response:
-            print(response['error'])
-            return 
-        elif 'table' in response:
-            await self.get_table_info(response)
-            return
-        else:
-            return
-    '''
-    '''
-    async def get_table_info(self, data):
-        """Prints bitrmex user table data on Position, Wallet, Margin, and Order."""
-        if(data['table'] == 'position'):
-            if(data['data']):
-                print(c[3] + "\nBitMEX positions - " + c[0])
-                for d in data['data']:
-                    print(d)
-                print(c[3] + "- - - - - - - - - - - - - " + c[0])
-            else:
-                print(c[3] + "\nBitMEX positions - No open positions." + c[0])
-            return
-        elif(data['table'] == 'wallet'):
-            print(c[3] + f"\nBitMEX wallet amount - {data['data'][0]['amount']}" + c[0])
-            return
-        elif(data['table'] == 'margin'):
-            print(c[3] + f"\nBitMEX session margin - {data['data'][0]['sessionMargin']}" + c[0])
-            return
-        elif(data['table'] == 'order'):
-            if(data['data']):
-                print(c[3] + "\nBitMEX orders - " + c[0])
-                for d in data['data']:
-                    print(d)
-                print(c[3] + "- - - - - - - - - - - - - " + c[0])
-            else:
-                print(c[3] + "\nBitMEX orders - No orders." + c[0])
-            return
-        else:
-            return
-    '''
+    async def get_positions_rest(self):
+        """Get current positions via REST API http."""
+        path = "position"
+        columns = ['lastPrice']
+        positions = await self._http_request(
+            path=path,
+            verb="GET",
+            query={
+                'columns': ['unrealisedRoePcnt','timestamp',
+                            'currentTimestamp','breakEvenPrice',
+                            'markPrice','markValue','currentQty',
+                            'avgEntryPrice','isOpen']
+            }
+        )
+        return positions
 
 
+
+    async def get_positions(self):
+        """Get current positions via Websocket."""
+        arg = ["position"]
+        self.ws_subscribe(arg)
+
+
+
+    async def get_stats_rest(self):
+        "Get exchange statistics via REST API http."
+        path = "stats"
+        stats = await self._http_request(
+            path=path,
+            verb="GET"
+        )
+        return stats
+
+
+    async def get_quote_rest(self):
+        """Get best bid/offer snapshot via REST API http."""
+        path = "quote"
+        quote = await self._http_request(
+            path=path,
+            verb="GET",
+            query={
+                'symbol': 'XBT:nearest',
+                'count': 1
+            }
+        )
+        return quote
+
+
+    async def get_quote(self):
+        """Get top level of the book via websocket."""
+        arg = ["quote"]
+        self.ws_subscribe(arg)
+
+
+    async def get_last_xbt_trade_rest(self):
+        "Get last trade price of XBT via REST API http."
+        path = "trade"
+        trade = await self._http_request(
+            path=path,
+            query={
+                'symbol':'XBT',
+                'count': 1,
+                'reverse': True
+            }
+        )
+        return trade[0]
+    '''
+
+    
+    
