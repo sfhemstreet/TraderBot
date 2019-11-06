@@ -248,6 +248,38 @@ class BitMEX:
         return sell_info
 
 
+    async def bulk_order(self, orders):
+        """Place a bulk order via REST API."""
+        orderArray = []
+        for o in orders:
+            if o['price'] and o['price'] < 0:
+                raise Exception(c[2] + "Order Price must be positive." + c[0])
+
+            if not o['quantity']:
+                raise Exception(c[2] + "Must supply order quantity." + c[0])
+
+            
+            # Generate a unique clOrdID with our prefix so we can identify it.
+            clOrdID = self._orderIDPrefix + base64.b64encode(uuid.uuid4().bytes).decode('utf8').rstrip('=\n')
+            postdict = {
+                'symbol': self.symbol,
+                'orderQty': o['quantity'],
+                'clOrdID': clOrdID,
+                'side': o['side']
+            }
+            if('price' in o): postdict['price'] = o['price']
+            if('stop_price' in o): postdict['stopPx'] = o['stop_price']
+
+            orderArray.append(postdict)
+        
+        endpoint = "order/bulk"
+        allOrders = {'orders': orderArray}
+        return await self._http_request(path=endpoint, postdict=allOrders, verb="POST")
+        
+           
+
+
+
     async def cancel(self, orderID):
         """Cancel an existing order by submitting order ID."""
         path = "order"
