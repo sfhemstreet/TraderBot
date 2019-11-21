@@ -10,10 +10,10 @@ BITMEX_API_KEY =        os.environ['BITMEX_API_KEY']
 BITMEX_API_SECRET =     os.environ['BITMEX_API_SECRET']
 
 # set Inflow threshold to base trades off of (float > 0)
-G_THRESHOLD = 0.0001
+G_THRESHOLD = None
 
 # set percentage of portfolio (bitmex wallet) available to with trade (float > 0 and < 1)
-G_PORTFOLIO_PERCENTAGE = 0.01
+G_PORTFOLIO_PERCENTAGE = None
 
 # color output :P
 c = (
