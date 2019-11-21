@@ -37,18 +37,17 @@ def main():
         print('\nWallet -\n', wallet_amount, '\n\n');
         trading_price = await bitmex.get_trading_price()
         print('\nTrading Price -\n', trading_price, '\n\n');
+        
 
         # calc trade amount based on percentage of portfolio available to trade
         trade_amount = 0.1 * wallet_amount
-
+       
         # if we have positions open we want to sell / open a short position
         # if we dont have any positions open, just open a short position
         if positions['open']:
             # sell and short
             quantity = len(positions['open'])
             lim = await create_limit_order(quantity, trading_price)
-            #await bitmex.sell(lim['quantity'],lim['price'])
-            # for now just sell - in furture use bulk order to sell and open short
             shor = await create_short(trading_price, trade_amount)
             await bitmex.bulk_order([lim, shor])
         else:
@@ -56,6 +55,17 @@ def main():
             my_short = await create_short(trading_price, trade_amount)
             await bitmex.short(my_short['quantity'], my_short['price'])
 
+
+        asyncio.sleep(10)
+
+        positions = await bitmex.get_position_data()
+        print('\nPositions -\n', positions, '\n\n');
+        wallet_amount = await bitmex.get_wallet_amount()
+        print('\nWallet -\n', wallet_amount, '\n\n');
+        trading_price = await bitmex.get_trading_price()
+        print('\nTrading Price -\n', trading_price, '\n\n');
+        await bitmex.get_order_data()
+        
 
     async def create_limit_order(quantity, trading_price):
         """Calculate limit price and return object with 'quantity' 'price' and 'side'."""
@@ -70,7 +80,7 @@ def main():
 
     async def create_short(trading_price, amount):
         """Calculate short amount and return object with 'quantity' 'price' and 'side'."""
-        quantity = 1
+        quantity = 100
         short_price = trading_price - 200
 
         print(c[3] + f"\nOpening short.\nQuanitity - {quantity}, Price - {short_price}\n" + c[0])
@@ -84,7 +94,7 @@ def main():
     try:
         # Create tasks for both websockets 
         loop.create_task(bitmex_ws_loop())
-        loop.create_task(do_this_after_delay(10,init_trade))
+        loop.create_task(do_this_after_delay(5,init_trade))
         # RUN 
         loop.run_forever()
     finally:
