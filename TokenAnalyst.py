@@ -24,7 +24,7 @@ class TokenAnalyst:
         """Connects to websocket and yields inflow data."""
         uri = "wss://ws.tokenanalyst.io"
         id = "token_analyst_stream"
-        channel = "btc_unconfirmed_exchange_flows"
+        channel = "btc_confirmed_exchange_flows"
         payload = {"event":"subscribe","channel":channel,"id":id,"key":self._key}
 
         async with websockets.connect(uri) as websocket:
@@ -54,6 +54,7 @@ class TokenAnalyst:
 
     async def on_data(self, data): 
         if(data['flowType'] == 'Inflow'):
+            print(data)
             return data
 
 
