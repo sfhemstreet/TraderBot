@@ -139,7 +139,7 @@ def main():
 
         # if we have positions open we want to sell / open a short position
         # if we dont have any positions open, just open a short position
-        if positions['open']:
+        if positions['open'] and positions['open'][0]['currentQty'] > 0:
             # sell and short
 
             logging.debug('Sell positions and open short')
@@ -160,8 +160,8 @@ def main():
     async def create_limit_order(quantity, trading_price):
         """Calculate limit price and return object with 'quantity' 'price' and 'side'."""
         # smaller difference makes trades execute faster
-        difference = 0.5
-        limit_price = trading_price - difference
+        difference = 0.2
+        limit_price = trading_price + difference
 
         logging.debug(f"Creating limit order. Quanitity - {quantity}, Price - {limit_price}")
         print(c[3] + f"\nCreating limit order.\nQuanitity - {quantity}, Price - {limit_price}\n" + c[0])

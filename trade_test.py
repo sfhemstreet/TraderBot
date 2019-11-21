@@ -42,11 +42,12 @@ def main():
         # calc trade amount based on percentage of portfolio available to trade
         trade_amount = 0.1 * wallet_amount
        
-        # if we have positions open we want to sell / open a short position
+        # if we have positions open we want to sell and open a short position
         # if we dont have any positions open, just open a short position
-        if positions['open']:
+        # if we have positions open but tehy are shorts, open more short positions
+        if positions['open'] and positions['open'][0]['currentQty'] > 0:
             # sell and short
-            quantity = len(positions['open'])
+            quantity = positions['open'][0]['currentQty']
             lim = await create_limit_order(quantity, trading_price)
             shor = await create_short(trading_price, trade_amount)
             await bitmex.bulk_order([lim, shor])
