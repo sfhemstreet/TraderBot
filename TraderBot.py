@@ -10,10 +10,10 @@ BITMEX_API_KEY =        os.environ['BITMEX_API_KEY']
 BITMEX_API_SECRET =     os.environ['BITMEX_API_SECRET']
 
 # set Inflow threshold to base trades off of (float > 0)
-G_THRESHOLD = None
+G_THRESHOLD = 0.0001
 
 # set percentage of portfolio (bitmex wallet) available to with trade (float > 0 and < 1)
-G_PORTFOLIO_PERCENTAGE = None
+G_PORTFOLIO_PERCENTAGE = 0.01
 
 # color output :P
 c = (
@@ -86,6 +86,8 @@ def main():
             # collect running average Inflow 
             await bitmex.calc_inflow_average(data['value'])
             
+            print(data)
+
             # check if Inflow is above threshold
             if(data['value'] > THRESHOLD):
                 print(c[3] + f"\n{data['to']} Inflow above threshold - {THRESHOLD}. Value - {data['value']}" + c[0])
@@ -93,14 +95,16 @@ def main():
                 await init_trade()
 
 
-    # WORK ON THIS
     async def init_trade():
         """Starts trade procedure by checking wallet, 
         positions, and trading price."""
         # get current positions, wallet amount, and trading price on Bitmex 
         positions = await bitmex.get_position_data()
+        print('\nPositions -\n', positions, '\n\n');
         wallet_amount = await bitmex.get_wallet_amount()
+        print('\nWallet -\n', wallet_amount, '\n\n');
         trading_price = await bitmex.get_trading_price()
+        print('\nTrading Price -\n', trading_price, '\n\n');
 
         # calc trade amount based on percentage of portfolio available to trade
         trade_amount = PORTFOLIO_PERCENTAGE * wallet_amount
@@ -110,69 +114,36 @@ def main():
         if positions['open']:
             # sell and short
             quantity = len(positions['open'])
-            order1 = await bulk_limit_order(quantity, trading_price)
-            order2 = await bulk_open_short(trading_price, trade_amount)
-            await bitmex.bulk_order([order1, order2])
+            lim = await create_limit_order(quantity, trading_price)
+            #await bitmex.sell(lim['quantity'],lim['price'])
+            # for now just sell - in furture use bulk order to sell and open short
+            shor = await create_short(trading_price, trade_amount)
+            await bitmex.bulk_order([lim, shor])
         else:
             # short
-            await open_short(trading_price, trade_amount)
+            my_short = await create_short(trading_price, trade_amount)
+            await bitmex.short(my_short['quantity'], my_short['price'])
 
 
-    # WORK ON THIS
-    async def stop_limit_order(quantity, trading_price):
-        """Calculate limit price and send to bitmex to sell."""
-        # if price drops 10 below the current trading price sell
-        limit_price = trading_price + 10
-        stop_price = trading_price - 10
+    async def create_limit_order(quantity, trading_price):
+        """Calculate limit price and return object with 'quantity' 'price' and 'side'."""
+        # smaller difference makes trades execute faster
+        difference = 0.5
+        limit_price = trading_price - difference
 
-        print(c[3] + f"\nStop limit order.\nQuanitity - {quantity}, Price - {limit_price}, Stop Price - {stop_price}\n" + c[0])
+        print(c[3] + f"\nCreating limit order.\nQuanitity - {quantity}, Price - {limit_price}\n" + c[0])
 
-        await bitmex.sell(quantity=quantity, price=limit_price, stop_price=stop_price)
-
-
-    # WORK ON THIS
-    async def bulk_limit_order(quantity, trading_price):
-        """Calculate limit price and return pre-order object to prepare for bulk order."""
-        # if price drops 10 below the current trading price sell
-        limit_price = trading_price + 10
-        stop_price = trading_price - 10
-
-        print(c[3] + f"\nBULK Stop limit order.\nQuanitity - {quantity}, Price - {limit_price}, Stop Price - {stop_price}\n" + c[0])
-
-        return {'quantity': quantity, 'price': limit_price, 'side': 'Sell' } # , stop_price=stop_price)
-
-
-    # WORK ON THIS
-    async def bulk_open_short(trading_price, amount):
-        """Calculate short amount and return pre-order object to prepare for bulk order."""
-        # This is wrong. Fix this. 
-        # It is the amount you are willing to lose 
-        # if the price goes up when betting that it will go down
-        #stop_price = trading_price + amount
-        quantity = 1
-        # fix this too plz
-        short_price = trading_price - 100
-
-        print(c[3] + f"\nBULK Opening short.\nQuanitity - {quantity}, Price - {short_price}\n" + c[0])
-
-        return {'quantity': quantity, 'price': short_price, 'side': 'Buy'} 
+        return {'quantity':quantity, 'price':limit_price, 'side': 'Sell'}
         
 
-
-    # WORK ON THIS
-    async def open_short(trading_price, amount):
-        """Calculate short amount and send to bitmex to open short."""
-        # This is wrong. Fix this. 
-        # It is the amount you are willing to lose 
-        # if the price goes up when betting that it will go down
-        #stop_price = trading_price + amount
+    async def create_short(trading_price, amount):
+        """Calculate short amount and return object with 'quantity' 'price' and 'side'."""
         quantity = 1
-        # fix this too plz
-        short_price = trading_price - 100
+        short_price = trading_price - 200
 
         print(c[3] + f"\nOpening short.\nQuanitity - {quantity}, Price - {short_price}\n" + c[0])
 
-        await bitmex.short(quantity=quantity, price=short_price) # , stop_price=stop_price)
+        return {'quantity': quantity, 'price': short_price, 'side': 'Sell'} 
     
 
     try:

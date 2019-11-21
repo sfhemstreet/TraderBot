@@ -193,7 +193,7 @@ class BitMEX:
 
     # REST API 
     # Code below is taken from BitMEX Market Maker and modified to fit this project
-    async def place_order(self, quantity, price=None, side=None, stop_price=None):
+    async def place_order(self, quantity, price=None, side=None):
         """Place an order via REST API."""
         if price and price < 0:
             raise Exception(c[2] + "Order Price must be positive." + c[0])
@@ -211,12 +211,11 @@ class BitMEX:
             'side': side
         }
         if(price): postdict['price'] = price
-        if(stop_price): postdict['stopPx'] = stop_price
 
         return await self._http_request(path=endpoint, postdict=postdict, verb="POST")
 
 
-    async def short(self, quantity, price=None, stop_price=None):
+    async def short(self, quantity, price=None):
         """Place a buy order.
         Returns order object. ID: orderID
         """
@@ -225,14 +224,13 @@ class BitMEX:
             quantity=quantity, 
             price=price,
             side=side, 
-            stop_price=stop_price
         )
         #print(short_info)
         self._short_positions.append(short_info)
         return short_info
     
 
-    async def sell(self, quantity, price=None, stop_price=None):
+    async def sell(self, quantity, price=None):
         """Place a sell order.
         Returns order object. ID: orderID
         """
@@ -241,7 +239,6 @@ class BitMEX:
             quantity=quantity, 
             price=price, 
             side=side,
-            stop_price=stop_price
         )
         #print(sell_info)
         self._sell_orders.append(sell_info)
@@ -268,7 +265,6 @@ class BitMEX:
                 'side': o['side']
             }
             if('price' in o): postdict['price'] = o['price']
-            if('stop_price' in o): postdict['stopPx'] = o['stop_price']
 
             orderArray.append(postdict)
         
