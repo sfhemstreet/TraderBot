@@ -1,5 +1,8 @@
 import asyncio
 import os
+import logging
+
+logging.basicConfig(filename="test.log", level=logging.DEBUG)
 
 from BitMEX import BitMEX
 from TokenAnalyst import TokenAnalyst
@@ -13,7 +16,10 @@ BITMEX_API_SECRET =     os.environ['BITMEX_API_SECRET']
 G_THRESHOLD = None
 
 # set percentage of portfolio (bitmex wallet) available to with trade (float > 0 and < 1)
-G_PORTFOLIO_PERCENTAGE = None
+G_PORTFOLIO_PERCENTAGE = 0.01
+
+# set default trade quantity ie 1 = $1 must be int > 0
+G_TRADE_QUANTITY = 5
 
 # color output :P
 c = (
@@ -25,6 +31,8 @@ c = (
 
             
 def main():
+    logging.debug(f"---- New Start ----")
+
     # create asyncio event loop
     loop = asyncio.get_event_loop() 
 
@@ -35,7 +43,7 @@ def main():
     bitmex = BitMEX(key=BITMEX_API_KEY, secret=BITMEX_API_SECRET)
 
     
-    # User Input Only If G_THRESHOLD / G_PORTFOLIO_PERCENTAGE Aren't Filled In 
+    # User Input Only If G_THRESHOLD or G_PORTFOLIO_PERCENTAGE or G_TRADE_AMOUNT  Aren't Filled In 
     #----------------------------------------------------------------------
     # get user input to set THRESHOLD if not declared globally (float > 0)
     if G_THRESHOLD == None:
@@ -59,7 +67,26 @@ def main():
         
     if PORTFOLIO_PERCENTAGE <= 0 or PORTFOLIO_PERCENTAGE >= 1:
         raise Exception(c[2] + "\nPORTFOLIO PERCENTAGE MUST BE ABOVE 0 AND BELOW 1\n" + c[0])
+
+
+    # get user input to set trade quanity 
+    if G_TRADE_QUANTITY == None:
+        TRADE_QUANTITY = int(input(c[3] + 
+        '''\nEnter quantity of each trade, ie 1 = $1
+        \n>>> ''' + c[0]))
+    else:
+        TRADE_QUANTITY = G_TRADE_QUANTITY
+        
+    if TRADE_QUANTITY <= 0:
+        raise Exception(c[2] + "\nTRADE QUANTITY MUST BE ABOVE 0\n" + c[0])
+
+    logging.debug(f"Threshold Set at - {THRESHOLD}")
+    logging.debug(f"Portfolio precentage set at - {PORTFOLIO_PERCENTAGE}")
+    logging.debug(f"Trade quantity is set at - {TRADE_QUANTITY}")
+
     #-----------------------------------------------------------------------
+
+
 
 
     # Websocket loop for streaming Token Analyst Inflow data and executing trades
@@ -90,6 +117,7 @@ def main():
 
             # check if Inflow is above threshold
             if(data['value'] > THRESHOLD):
+                logging.debug(f"{data['to']} Inflow above threshold - {THRESHOLD}. Value - {data['value']}")
                 print(c[3] + f"\n{data['to']} Inflow above threshold - {THRESHOLD}. Value - {data['value']}" + c[0])
                 # start trade 
                 await init_trade()
@@ -98,14 +126,14 @@ def main():
     async def init_trade():
         """Starts trade procedure by checking wallet, 
         positions, and trading price."""
+
+        logging.debug('Init Trade')
+
         # get current positions, wallet amount, and trading price on Bitmex 
         positions = await bitmex.get_position_data()
-        print('\nPositions -\n', positions, '\n\n');
         wallet_amount = await bitmex.get_wallet_amount()
-        print('\nWallet -\n', wallet_amount, '\n\n');
         trading_price = await bitmex.get_trading_price()
-        print('\nTrading Price -\n', trading_price, '\n\n');
-
+        
         # calc trade amount based on percentage of portfolio available to trade
         trade_amount = PORTFOLIO_PERCENTAGE * wallet_amount
 
@@ -113,14 +141,18 @@ def main():
         # if we dont have any positions open, just open a short position
         if positions['open']:
             # sell and short
-            quantity = len(positions['open'])
+
+            logging.debug('Sell positions and open short')
+
+            quantity = positions['open'][0]['currentQty']
             lim = await create_limit_order(quantity, trading_price)
-            #await bitmex.sell(lim['quantity'],lim['price'])
-            # for now just sell - in furture use bulk order to sell and open short
             shor = await create_short(trading_price, trade_amount)
             await bitmex.bulk_order([lim, shor])
         else:
             # short
+
+            logging.debug('No positions, Open short')
+
             my_short = await create_short(trading_price, trade_amount)
             await bitmex.short(my_short['quantity'], my_short['price'])
 
@@ -131,6 +163,7 @@ def main():
         difference = 0.5
         limit_price = trading_price - difference
 
+        logging.debug(f"Creating limit order. Quanitity - {quantity}, Price - {limit_price}")
         print(c[3] + f"\nCreating limit order.\nQuanitity - {quantity}, Price - {limit_price}\n" + c[0])
 
         return {'quantity':quantity, 'price':limit_price, 'side': 'Sell'}
@@ -138,9 +171,10 @@ def main():
 
     async def create_short(trading_price, amount):
         """Calculate short amount and return object with 'quantity' 'price' and 'side'."""
-        quantity = 1
+        quantity = TRADE_QUANTITY
         short_price = trading_price - 200
 
+        logging.debug(f"Opening short. Quanitity - {quantity}, Price - {short_price}")
         print(c[3] + f"\nOpening short.\nQuanitity - {quantity}, Price - {short_price}\n" + c[0])
 
         return {'quantity': quantity, 'price': short_price, 'side': 'Sell'} 

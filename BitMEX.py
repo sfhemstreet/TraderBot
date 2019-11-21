@@ -53,6 +53,7 @@ class BitMEX:
         self.margin_data = None
         self.order_data = None
         self.trade_data = None
+        self.execution_data = None
 
 
     async def calc_inflow_average(self, new_value):
@@ -76,7 +77,7 @@ class BitMEX:
             'open': []
         }
         for p in self.position_data:
-            if 'isOpen' in p == False:
+            if p['isOpen'] == False:
                 pos_data['closed'].append(p)
             else:
                 pos_data['open'].append(p)
@@ -130,7 +131,7 @@ class BitMEX:
 
     async def get_all_info(self):
         """Gets position, margin, order, wallet, and trade data via websocket."""
-        args = ["position","margin","wallet","order","trade:XBTUSD"]
+        args = ["position","margin","wallet","order","trade:XBTUSD","execution"]
         await self.ws_subscribe(args)
        
 
@@ -189,6 +190,10 @@ class BitMEX:
             if(data['data']):
                 self.trade_data = data['data']
 
+        elif(data['table'] == 'execution'):
+            if(data['data']):
+                self.execution_data = data['data']
+
 
 
     # REST API 
@@ -216,10 +221,10 @@ class BitMEX:
 
 
     async def short(self, quantity, price=None):
-        """Place a buy order.
+        """Place a short order.
         Returns order object. ID: orderID
         """
-        side="Buy"
+        side="Sell"
         short_info = await self.place_order(
             quantity=quantity, 
             price=price,
