@@ -4,7 +4,7 @@ Project to test reading BitMEX inflow data from
 Token Analyst's websocket to trigger trades on the
 BitMEX exchange.
 
-- Connects to Token Analyst websocket for on-chain inflow data
+- Connects to Token Analyst websocket for on-chain data
 - Connects to BitMEX websocket for realtime user/trade data
 - Uses Bitmex REST API to buy/sell XBTUSD
 
@@ -14,6 +14,13 @@ Required API keys
 - Must have TokenAnalyst Pro Api key
 - Must have BitMEX API key and secret
 
-To Test
-- install the requirements in requirements.txt
-- run TraderBot.py 
+To Run
+- Install requirements: pip install -r requirements.txt
+- open config.py 
+    - enter API keys 
+        - you can optionally save your API keys as enviroment variables
+    - enter trading variables
+- fill in my_trade_function with your own trade logic
+- run TraderBot.py
+
+
