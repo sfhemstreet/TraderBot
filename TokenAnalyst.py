@@ -54,7 +54,7 @@ class TokenAnalyst:
 
     async def on_data(self, data): 
         if(data['flowType'] == 'Inflow'):
-            print(data)
+            #print(data)
             return data
 
 

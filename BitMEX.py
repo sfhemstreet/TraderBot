@@ -44,8 +44,7 @@ class BitMEX:
         self._session.headers.update({'accept': 'application/json'})
         self.timeout = timeout
         self._orderIDPrefix = orderIDPrefex # cannot be longer than 13 chars long
-        self._short_positions = []
-        self._sell_orders = []
+        self._order_IDs = []
         self.retries = 0 
         # user / trade data
         self.wallet_data = None
@@ -197,91 +196,197 @@ class BitMEX:
 
 
     # REST API 
-    # Code below is taken from BitMEX Market Maker and modified to fit this project
-    async def place_order(self, quantity, price=None, side=None):
-        """Place an order via REST API."""
+    async def make_order(self, quantity, price=None, side=None, orderType=None, displayQty=None, stopPx=None, pegOffsetValue=None, pegPriceType=None, timeInForce=None, execInst=None):
+        """
+            Returns an order object ready to use in bulk or single order. 
+            Must supply quantity. 
+            If no price supplied, order is market sell or buy.
+            side is either 'Buy' or 'Sell'
+            displayQty of 0 hides order
+            stopPx, optional trigger price, use a price below the current price for stop-sell orders and buy-if-touched orders
+        """
         if price and price < 0:
             raise Exception(c[2] + "Order Price must be positive." + c[0])
 
         if not quantity:
             raise Exception(c[2] + "Must supply order quantity." + c[0])
 
-        endpoint = "order"
+        if side and side != 'Sell' and side != 'Buy':
+            raise Exception(c[2] + "Side must be 'Sell' or 'Buy'." + c[0])
+
+        if orderType and (
+            orderType != 'Market' or
+            orderType != 'Limit' or
+            orderType != 'Stop' or 
+            orderType != 'StopLimit' or
+            orderType != 'MarketIfTouched' or
+            orderType != 'LimitIfTouched' or
+            orderType != 'Pegged'
+        ):
+            raise Exception(c[2] + "orderType must be Market, Limit, Stop, StopLimit, MarketIfTouched, LimitIfTouched, or Pegged" + c[0])
+
+        if displayQty and displayQty < 0:
+            raise Exception(c[2] + "DisplayQty is negative, must be 0 to hide order or positive." + c[0])
+        
+        if pegPriceType and (
+            pegPriceType != 'LastPeg' or 
+            pegPriceType != 'MidPricePeg' or 
+            pegPriceType != 'MarketPeg' or 
+            pegPriceType != 'PrimaryPeg' or 
+            pegPriceType != 'TrailingStopPeg'
+        ):
+            raise Exception(c[2] + "pegPriceType must be LastPeg, MidPricePeg, MarketPeg, PrimaryPeg, or TrailingStopPeg." + c[0])
+
+        if timeInForce and (
+            timeInForce != 'Day' or 
+            timeInForce != 'GoodTillCancel' or 
+            timeInForce != 'ImmediateOrCancel' or 
+            timeInForce != 'FillOrKill'
+        ):
+            raise Exception(c[2] + "timeInForce must be Day, GoodTillCancel, ImmediateOrCancel, or FillOrKill" + c[0])
+        
+        if execInst and (
+            execInst != 'ParticipateDoNotInitiate' or 
+            execInst != 'AllOrNone' or 
+            execInst != 'MarkPrice' or 
+            execInst != 'IndexPrice' or 
+            execInst != 'LastPrice' or 
+            execInst != 'Close' or 
+            execInst != 'ReduceOnly' or 
+            execInst != 'Fixed'
+        ):
+            raise Exception(c[2] + "execInst must be ParticipateDoNotInitiate, AllOrNone, MarkPrice, IndexPrice, LastPrice, Close, ReduceOnly, or Fixed." + c[0])
+        
+        if execInst and execInst == 'AllOrNone' and displayQty != 0:
+            raise Exception(c[2] + "execInst is 'AllOrNone', displayQty must be 0" + c[0])
+
         # Generate a unique clOrdID with our prefix so we can identify it.
         clOrdID = self._orderIDPrefix + base64.b64encode(uuid.uuid4().bytes).decode('utf8').rstrip('=\n')
-        postdict = {
+        order = {
             'symbol': self.symbol,
             'orderQty': quantity,
             'clOrdID': clOrdID,
             'side': side
         }
-        if(price): postdict['price'] = price
+        # add to order if supplied 
+        if price:           order['price'] = price
+        if displayQty:      order['displayQty'] = displayQty
+        if stopPx:          order['stopPx'] = stopPx
+        if pegOffsetValue:  order['pegOffsetValue'] = pegOffsetValue
+        if timeInForce:     order['timeInForce'] = timeInForce
+        if execInst:        order['execInst'] = execInst
+        if orderType:       order['ordType'] = orderType
 
-        return await self._http_request(path=endpoint, postdict=postdict, verb="POST")
+        return order
 
 
-    async def short(self, quantity, price=None):
-        """Place a short order.
+    async def market_buy(self, quantity):
+        '''
+        Buy at market price. 
         Returns order object. ID: orderID
-        """
+        '''
+        side="Buy"
+        order = await self.make_order(
+            quantity=quantity, 
+            side=side, 
+        )
+        return await self.place_order(order)
+
+
+    async def market_sell(self, quantity):
+        '''
+        Sell at market price.
+        Returns order object. ID: orderID
+        '''
         side="Sell"
-        short_info = await self.place_order(
+        order = await self.make_order(
+            quantity=quantity, 
+            side=side, 
+        )
+        return await self.place_order(order)
+    
+
+    async def limit_buy(self, quantity, price):
+        '''Place a limit buy order.
+        Returns order object ID: orderID
+        '''
+        side = "Buy"
+        order = await self.make_order(
             quantity=quantity, 
             price=price,
             side=side, 
         )
-        #print(short_info)
-        self._short_positions.append(short_info)
-        return short_info
-    
+        return await self.place_order(order)
 
-    async def sell(self, quantity, price=None):
-        """Place a sell order.
+    
+    async def short(self, quantity, price):
+        """Place a short order.
         Returns order object. ID: orderID
         """
         side="Sell"
-        sell_info = await self.place_order(
+        order = await self.make_order(
             quantity=quantity, 
-            price=price, 
-            side=side,
+            price=price,
+            side=side, 
         )
-        #print(sell_info)
-        self._sell_orders.append(sell_info)
-        return sell_info
+        return await self.place_order(order)
 
 
-    async def bulk_order(self, orders):
+    async def stop_order(self, quantity, stopPx, price=None, execInst=None):
+        '''Place stop order.
+        Use a price below the current price for stop-sell orders and buy-if-touched orders. 
+        Use execInst of 'MarkPrice' or 'LastPrice' to define the current price used for triggering.
+        '''
+        order = await self.make_order(
+            quantity=quantity, 
+            stopPx=stopPx,
+            price=price,
+            execInst=execInst
+        )
+        return await self.place_order(order)
+
+    
+    async def close(self, quantity=None, side=None):
+        '''
+        cancel other active limit orders with the same side and symbol if the open quantity exceeds the current position.
+        Side or quantity required.
+
+        '''
+        if quantity == None and side == None:
+            raise Exception(c[2] + "Side or quantity required to close." + c[0])
+
+        clOrdID = self._orderIDPrefix + base64.b64encode(uuid.uuid4().bytes).decode('utf8').rstrip('=\n')
+        order = {
+            'symbol': self.symbol,
+            'clOrdID': clOrdID,
+            'execInst': 'Close'
+        }
+        if quantity: order['orderQty'] = quantity,
+        if side: order['side'] = side
+
+        return await self.place_order(order)
+
+
+    async def place_order(self, order):
+        '''
+            Send single order. 
+            return order ID
+        '''
+        endpoint = "order"
+        return await self._http_request(path=endpoint, postdict=order, verb="POST")
+
+
+    async def place_bulk_order(self, orders):
         """Place a bulk order via REST API."""
-        orderArray = []
-        for o in orders:
-            if o['price'] and o['price'] < 0:
-                raise Exception(c[2] + "Order Price must be positive." + c[0])
+        if len(orders) < 1:
+            raise Exception(c[2] + "Orders must be more than 1 order." + c[0])
 
-            if not o['quantity']:
-                raise Exception(c[2] + "Must supply order quantity." + c[0])
-
-            
-            # Generate a unique clOrdID with our prefix so we can identify it.
-            clOrdID = self._orderIDPrefix + base64.b64encode(uuid.uuid4().bytes).decode('utf8').rstrip('=\n')
-            postdict = {
-                'symbol': self.symbol,
-                'orderQty': o['quantity'],
-                'clOrdID': clOrdID,
-                'side': o['side']
-            }
-            if('price' in o): postdict['price'] = o['price']
-
-            orderArray.append(postdict)
-        
         endpoint = "order/bulk"
-        allOrders = {'orders': orderArray}
+        allOrders = {'orders': orders}
         return await self._http_request(path=endpoint, postdict=allOrders, verb="POST")
         
-           
 
-
-
-    async def cancel(self, orderID):
+    async def cancel_order(self, orderID):
         """Cancel an existing order by submitting order ID."""
         path = "order"
         postdict = {
