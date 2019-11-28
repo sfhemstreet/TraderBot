@@ -5,7 +5,7 @@ logging.basicConfig(filename="test.log", level=logging.DEBUG)
 
 from BitMEX import BitMEX
 from TokenAnalyst import TokenAnalyst
-import trades
+import trade
 from check_config import check_config
 from colors import c
 
@@ -47,7 +47,7 @@ def main():
 
                 # lets sell a little below the last trading price 
                 price = last_price - 1
-                sell_order = trades.limit_sell()
+                sell_order = trade.limit_sell()
         '''
         pass 
         # right now getting some funky results from bitmex websocket
