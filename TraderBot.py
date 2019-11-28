@@ -52,12 +52,12 @@ def main():
 
                 # send to bitmex, 
                 # we get back the order details that we can use to ammend/cancel/keep tarck of the order
-                order_details = bitmex.place_order(sell_order)
+                order_details = await bitmex.place_order(sell_order)
 
             else:
                 short_price = last_price - 100
                 short_order = trade.limit_sell(quantity=10, price=short_price)
-                short_order_details = bitmex.place_order(short_order)
+                short_order_details = await bitmex.place_order(short_order)
 
         
         # right now getting some funky results from bitmex websocket
