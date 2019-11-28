@@ -76,8 +76,8 @@ class TokenAnalyst:
         """
         Checks Token Analyst data for Inflow.
         Returns -1 or the inflow value.
-        Supply 'threshold' value to filter results to those above threshold
-        supply 'exchange' value to filter by exchange, default is Bitmex 
+        Supply 'threshold' value to filter results to those above threshold.
+        Supply 'exchange' value to filter by exchange, default is Bitmex. 
         (Valid exchange values are All, Binance, Bitmex, Bitfinex, Bittrex, Kraken, Poloniex, and Huobi)
         """
         value = self._inflow_outflow_check(data=data, threshold=threshold, exchange=exchange, check_flowtype='Inflow')
@@ -88,8 +88,8 @@ class TokenAnalyst:
         """
         Checks Token Analyst data for Outflow.
         Returns -1 or the outflow value.
-        Supply 'threshold' value to filter results to those above threshold
-        supply 'exchange' value to filter by exchange, default is Bitmex 
+        Supply 'threshold' value to filter results to those above threshold.
+        Supply 'exchange' value to filter by exchange, default is Bitmex. 
         (Valid exchange values are All, Binance, Bitmex, Bitfinex, Bittrex, Kraken, Poloniex, and Huobi)
         """
         value = self._inflow_outflow_check(data=data, threshold=threshold, exchange=exchange, check_flowtype='Outflow')
@@ -116,40 +116,48 @@ class TokenAnalyst:
 
 
     def get_transactionId(self, data):
+        """Returns transaction ID from given Token Analyst websocket data."""
         transactionId = data['transactionId']
         return transactionId
 
 
     def get_blockHash(self, data):
+        """Returns block hash from given Token Analyst websocket data."""
         blockHash = data['blockHash']
         return blockHash
 
 
     def get_blockNumber(self, data):
+        """Returns block number from given Token Analyst websocket data."""
         blockNumber = data['blockNumber']
         return blockNumber
 
 
     def get_timestamp(self, data):
+        """Returns timestamp from given Token Analyst websocket data."""
         timestamp = data['timestamp']
         return timestamp
 
 
     def get_from(self, data):
+        """Returns 'from' from given Token Analyst websocket data."""
         from_data = data['from'][0]
         return from_data
 
 
     def get_to(self, data):
+        """Returns exchange the Token Analyst websocket data is to."""
         to = data['to'][0]
         return to
 
 
     def get_value(self, data):
+        """Returns value from given Token Analyst websocket data."""
         value = data['value']
         return value
 
 
     def get_flowtype(self, data):
+        """Returns the flowtype of the given Token Analyst websocket data, either 'Inflow' or 'Outflow'."""
         flowType = data['flowType']
         return flowType

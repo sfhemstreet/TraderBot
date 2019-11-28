@@ -1,10 +1,10 @@
 from colors import c
 import base64
 import uuid
-from config import G_DEFAULT_SYMBOL # if you dont have this declared in config go do that
+from config import G_DEFAULT_BITMEX_SYMBOL # if you dont have this declared in config go do that
 
 '''
-    trade functions 
+    TRADE
     each returns an order that can be used in a single or bulk order (ie bitmex.place_order(my_order) or bitmex.bulk_order([order1, order2])).
     add your own trade functions here or use make_order 
 '''
@@ -69,7 +69,7 @@ def stop_order(self, quantity, stopPx, price=None, execInst=None):
     return order
 
 
-def close(self, quantity=None, side=None, symbol=G_DEFAULT_SYMBOL):
+def close(self, quantity=None, side=None, symbol=G_DEFAULT_BITMEX_SYMBOL):
     '''
     Returns a close order ready to send to Bitmex.
     cancel other active limit orders with the same side and symbol if the open quantity exceeds the current position.
@@ -92,7 +92,7 @@ def close(self, quantity=None, side=None, symbol=G_DEFAULT_SYMBOL):
 
 def make_order(
     quantity, 
-    symbol=G_DEFAULT_SYMBOL, 
+    symbol=G_DEFAULT_BITMEX_SYMBOL, 
     price=None, 
     side=None, 
     orderType=None, 

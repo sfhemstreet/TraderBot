@@ -8,19 +8,27 @@ BitMEX exchange.
 - Connects to BitMEX websocket for realtime user/trade data
 - Uses Bitmex REST API to buy/sell XBTUSD
 
-By default all trades are on the Bitmex TestNet
 
-Required API keys
-- Must have TokenAnalyst Pro Api key
-- Must have BitMEX API key and secret
+## Requirements
 
-To Run
+- TokenAnalyst Pro Api key
+- BitMEX API key and secret
+
+
+## Getting Started
+
+- Clone or download project
 - Install requirements: pip install -r requirements.txt
-- open config.py 
-    - enter API keys 
+- Set up config.py 
+    - enter your Token Analyst API key, and BitMEX API key and secret
         - you can optionally save your API keys as environment variables
-    - enter trading variables
-- in TraderBot.py edit the traderBot function with your own trade logic
-- run TraderBot.py
+    - choose symbol and BitMEX endpoints 
+        - (default symbol is XBTUSD, and default endpoints use the BitMEX testnet)
+- in TraderBot.py, write your own trade logic in the trader_bot function 
+- run TraderBot.py 
 
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
 

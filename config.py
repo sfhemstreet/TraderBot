@@ -18,14 +18,12 @@ G_BITMEX_API_SECRET =     'SECRET'
     Optional - if not filled out here you will have to input 
     them manually every time.
 '''
-# defualt symbol for trades 
-G_DEFAULT_SYMBOL = 'XBTUSD'
+# default symbol for trades 
+G_DEFAULT_BITMEX_SYMBOL = "XBTUSD"
 
-# set Inflow threshold to base trades off of (float > 0)
-G_INFLOW_THRESHOLD = None
+# default bitmex websocket is set to testnet, change to make real trades 
+G_DEFAULT_BITMEX_WS_URL = "wss://testnet.bitmex.com" # for real trades use "wss://www.bitmex.com"
 
-# set percentage of portfolio (bitmex wallet) available to with trade (float > 0 and < 1)
-G_PORTFOLIO_PERCENTAGE = None
+# default bitmex REST API url is set to testnet, change to make real trades
+G_DEFAULT_BITMEX_BASE_URL = "https://testnet.bitmex.com/api/v1/" # for real trades use "https://www.bitmex.com/api/v1"
 
-# set default trade quantity ie 1 = $1 must be an integer > 0
-G_TRADE_QUANTITY = None

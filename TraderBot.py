@@ -12,11 +12,11 @@ from colors import c
 def main():
 
     # ---------- Your code here ---------- #
-    async def traderBot(data):
+    async def trader_bot(data):
         """
         Recieves blockchain data from Token Analyst websocket 
         """
-        '''
+        
         # Example Code -
         #   in this example we will trigger a trade based on Inflows over a certain value.
         #   when we get data that is an Inflow and above our threshold, 
@@ -24,7 +24,6 @@ def main():
         #   or open a short position if we do not
         #---------------------------------------
 
-        # only look for Inflow values above this threshold
         inflow_threshold = 100
 
         # using token_analyst method 'check_for_inflow_value'
@@ -47,15 +46,26 @@ def main():
 
                 # lets sell a little below the last trading price 
                 price = last_price - 1
-                sell_order = trade.limit_sell()
-        '''
-        pass 
+
+                # make an order
+                sell_order = trade.limit_sell(quantity=open_positions_qty, price=price)
+
+                # send to bitmex, 
+                # we get back the order details that we can use to ammend/cancel/keep tarck of the order
+                order_details = bitmex.place_order(sell_order)
+
+            else:
+                short_price = last_price - 100
+                short_order = trade.limit_sell(quantity=10, price=short_price)
+                short_order_details = bitmex.place_order(short_order)
+
+        
         # right now getting some funky results from bitmex websocket
         # probably has to do with changes on their end, (ie symbol / index changes, websocket response changes)
         # gonna wait a little a see if they fix there stuff 
 
 
-        # End traderBot 
+    # End trader_bot 
     # ------------------------------------ #
 
 
@@ -73,21 +83,20 @@ def main():
     # create asyncio event loop
     loop = asyncio.get_event_loop() 
 
-    # Websocket loop for streaming Token Analyst Inflow data and executing trades
+    # Websocket loop for streaming Token Analyst data 
+    # sends data to trader_bot 
     async def token_analyst_ws_loop():
-        """Recieves websocket data from Token Analyst and sends data to traderBot"""
+        """Recieves websocket data from Token Analyst and sends data to traderBot."""
         async for data in token_analyst.connect():
             if(data == None):
                 continue
             else:
-                await traderBot(data)
+                await trader_bot(data)
           
-
     # Websocket Loop for streaming Bitmex data
     async def bitmex_ws_loop():
         """Connect to bitmex websocket to get updates on market and user data."""
         await bitmex.connect()
-
 
     try:
         # Create tasks for both websockets 
@@ -108,81 +117,3 @@ async def do_this_after_delay(delay, do_this):
 if __name__ == "__main__":
     main()
 
-
-
-'''
-    async def check_for_inflow(data):
-        """Check if data is an Inflow event to our exchange, 
-        Collect average inflow, and see if Inflow is above threshold."""
-
-        if(data['flowType'] == 'Inflow' and data['to'][0] == 'Bitmex'):
-            # collect running average Inflow 
-            await bitmex.calc_inflow_average(data['value'])
-            
-            print(data)
-
-            # check if Inflow is above threshold
-            if(data['value'] > INFLOW_THRESHOLD):
-                logging.debug(f"{data['to']} Inflow above threshold - {INFLOW_THRESHOLD}. Value - {data['value']}")
-                print(c[3] + f"\n{data['to']} Inflow above threshold - {INFLOW_THRESHOLD}. Value - {data['value']}" + c[0])
-                # start trade 
-                await init_trade()
-
-
-
-    async def init_trade():
-        """Starts trade procedure by checking wallet, 
-        positions, and trading price."""
-
-        logging.debug('Init Trade')
-
-        # get current positions, wallet amount, and trading price on Bitmex 
-        positions = await bitmex.get_position_data()
-        wallet_amount = await bitmex.get_wallet_amount()
-        trading_price = await bitmex.get_trading_price()
-        
-        # calc trade amount based on percentage of portfolio available to trade
-        trade_amount = PORTFOLIO_PERCENTAGE * wallet_amount
-
-        # if we have positions open we want to sell / open a short position
-        # if we dont have any positions open, just open a short position
-        if positions['open'] and positions['open'][0]['currentQty'] > 0:
-            # sell and short
-
-            logging.debug('Sell positions and open short')
-
-            quantity = positions['open'][0]['currentQty']
-            lim = await create_limit_order(quantity, trading_price)
-            shor = await create_short(trading_price, trade_amount)
-            await bitmex.bulk_order([lim, shor])
-        else:
-            # short
-
-            logging.debug('No positions, Open short')
-
-            my_short = await create_short(trading_price, trade_amount)
-            await bitmex.short(my_short['quantity'], my_short['price'])
-
-
-    async def create_limit_order(quantity, trading_price):
-        """Calculate limit price and return object with 'quantity' 'price' and 'side'."""
-        # smaller difference makes trades execute faster
-        difference = 0.2
-        limit_price = trading_price - difference
-
-        logging.debug(f"Creating limit order. Quanitity - {quantity}, Price - {limit_price}")
-        print(c[3] + f"\nCreating limit order.\nQuanitity - {quantity}, Price - {limit_price}\n" + c[0])
-
-        return {'quantity':quantity, 'price':limit_price, 'side': 'Sell'}
-        
-
-    async def create_short(trading_price, amount):
-        """Calculate short amount and return object with 'quantity' 'price' and 'side'."""
-        quantity = TRADE_QUANTITY
-        short_price = trading_price - 200
-
-        logging.debug(f"Opening short. Quanitity - {quantity}, Price - {short_price}")
-        print(c[3] + f"\nOpening short.\nQuanitity - {quantity}, Price - {short_price}\n" + c[0])
-
-        return {'quantity': quantity, 'price': short_price, 'side': 'Sell'} 
-'''
