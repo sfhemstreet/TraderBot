@@ -11,7 +11,7 @@ import base64
 import uuid
 import logging
 import bitmex_helpers
-from config import G_DEFAULT_SYMBOL 
+from config import G_DEFAULT_BITMEX_SYMBOL, G_DEFAULT_BITMEX_WS_URL, G_DEFAULT_BITMEX_BASE_URL
 
 
 # ANSI colors
@@ -22,14 +22,8 @@ c = (
     "\033[35m",  # Magenta
 )
 
-# ws_url is set to testnet, change to make real trades 
-WS_URL = "wss://testnet.bitmex.com"
-WS_VERB = "GET"
-WS_ENDPOINT = "/realtime"
-
-
 class BitMEX:
-    def __init__(self, key, secret, symbol=G_DEFAULT_SYMBOL, orderIDPrefex="traderbot_", base_url="https://testnet.bitmex.com/api/v1/", timeout=8):
+    def __init__(self, key, secret, symbol=G_DEFAULT_BITMEX_SYMBOL, orderIDPrefex="traderbot_", base_url=G_DEFAULT_BITMEX_BASE_URL, ws_url=G_DEFAULT_BITMEX_WS_URL, timeout=8):
         self.name = "Bitmex"
         self._key = key
         self._secret = secret
@@ -112,11 +106,14 @@ class BitMEX:
     # Following code is for websocket connection - 
     async def connect(self):
         """Connects to Bitmex websocket."""
+        WS_VERB = "GET"
+        WS_ENDPOINT = "/realtime"
         EXPIRES = int(round(time.time()) + 100)
-        uri = WS_URL + WS_ENDPOINT
+        uri = self.ws_url + WS_ENDPOINT
         signature = bitmex_helpers.generate_signature(self._secret, WS_VERB, WS_ENDPOINT, EXPIRES)
         id = "bitMEX_stream"
         payload = {"op": "authKeyExpires", "args": [self._key, EXPIRES, signature]}
+
         async with websockets.connect(uri) as websocket:
             self._ws = websocket
             await websocket.send(json.dumps(payload))
@@ -125,17 +122,18 @@ class BitMEX:
                 if msg_type == 'INFO':
                     pass
                 elif msg_type == 'SUCCESS':
-                    await self.get_all_info() 
+                    args = self.get_all_info() 
+                    await self.ws_subscribe(args)
                 elif msg_type == 'ERROR':
                     raise Exception(c[2] + "\nERROR CONNECTING TO BITMEX WEBSOCKET" + c[0])
                     return
 
 
-    async def get_all_info(self):
-        """Gets position, margin, order, wallet, and trade data via websocket."""
+    def get_all_info(self):
+        """Returns websocket args to subscribe to position, margin, order, wallet, and trade."""
         trade = "trade:" + self.symbol
         args = ["position","margin","wallet","order",trade,"execution"]
-        await self.ws_subscribe(args)
+        return args 
        
 
     async def ws_subscribe(self, args):
@@ -144,38 +142,29 @@ class BitMEX:
         id = "bitMEX_stream"
         await self._ws.send(json.dumps(payload))
         async for msg in self._ws:
-            msg_type = await self.interpret_msg_type(json.loads(msg),id)
-            if msg_type == 'INFO':
-                pass
-            elif msg_type == 'SUCCESS':
-                pass
-            elif msg_type == 'ERROR':
-                raise Exception(c[2] + "\nERROR SUBSCRIBING TO BITMEX WEBSOCKET" + c[0])
-            elif msg_type == 'TABLE':
-                await self.store_table_info(msg)
-
+            await self.interpret_msg_type(json.loads(msg),id)
+            
     
     async def interpret_msg_type(self, response, id):
         """Gets response from websocket and returns type of response, ie table, info, success, error."""
-        print('bitmex ws response', response)
-
         if 'info' in response:
             print(c[1] + f"\n{response['info']} Limit : {response['limit']}" + c[0]) 
             return 'INFO'
         elif 'success' in response:
             if 'subscribe' in response:
                 print(c[1] + f"\nBitMEX websocket successfully subscribed to {response['subscribe']}" + c[0])
-            return 'SUCCESS'
+                return 'SUCCESS'
         elif 'error' in response:
-            print(c[2] + f"\n{response}" + c[0])
+            print(c[2] + f"\nBitmex Error response - \n{response}" + c[0])
+            raise Exception(c[2] + "\nERROR SUBSCRIBING TO BITMEX WEBSOCKET" + c[0])
             return 'ERROR'
         elif 'table' in response:
+            await self.store_table_info(response)
             return 'TABLE'
         
 
-    async def store_table_info(self, raw_data):
+    async def store_table_info(self, data):
         """Stores bitmex table data on Position, Wallet, Margin, Order, and Trade."""
-        data = json.loads(raw_data)
         if(data['table'] == 'position'):
             if(data['data']):
                 if data['data'][0]['isOpen']:
@@ -185,31 +174,31 @@ class BitMEX:
 
         elif(data['table'] == 'wallet'):
             print('wallet', data['data'])
-            self.wallet_data = data['data'][0]
+            #self.wallet_data = data['data'][0]
 
         elif(data['table'] == 'margin'):
             print('margin', data)
             if(data['data']):
                 print('margin', data['data'])
-                self.margin_data = data['data']
+                #self.margin_data = data['data']
 
         elif(data['table'] == 'order'):
             print('order', data)
             if(data['data']):
                 print('order', data['data'])
-                self.order_data.append(data['data'][0])
+                #self.order_data.append(data['data'][0])
 
         elif(data['table'] == 'trade'):
             print('trade', data)
             if(data['data']):
                 print('trade', data['data'])
-                self.trade_data.append(data['data'][0])
+                #self.trade_data.append(data['data'][0])
 
         elif(data['table'] == 'execution'):
             print('exe', data)
             if(data['data']):
                 print('execution', data['data'])
-                self.execution_data.append(data['data'][0])
+                #self.execution_data.append(data['data'][0])
 
 
     # REST API 
