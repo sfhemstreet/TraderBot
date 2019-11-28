@@ -11,6 +11,7 @@ import base64
 import uuid
 import logging
 import bitmex_helpers
+from config import G_DEFAULT_SYMBOL 
 
 
 # ANSI colors
@@ -28,7 +29,7 @@ WS_ENDPOINT = "/realtime"
 
 
 class BitMEX:
-    def __init__(self, key, secret, symbol="XBTUSD", orderIDPrefex="mm_bitmex_", base_url="https://testnet.bitmex.com/api/v1/", timeout=8):
+    def __init__(self, key, secret, symbol=G_DEFAULT_SYMBOL, orderIDPrefex="traderbot_", base_url="https://testnet.bitmex.com/api/v1/", timeout=8):
         self.name = "Bitmex"
         self._key = key
         self._secret = secret
@@ -48,14 +49,17 @@ class BitMEX:
         self.retries = 0 
         # user / trade data
         self.wallet_data = None
-        self.position_data = None
+        self.position_data = {
+            'closed': None,
+            'open': None
+        }
         self.margin_data = None
-        self.order_data = None
-        self.trade_data = None
-        self.execution_data = None
+        self.order_data = []
+        self.trade_data = []
+        self.execution_data = []
 
 
-    async def calc_inflow_average(self, new_value):
+    def calc_inflow_average(self, new_value):
         """Calculates running average from token analys inflow 
         data and prints the running average for every x inflows."""
         # set x to how many data points you want to average before it is printed
@@ -69,40 +73,39 @@ class BitMEX:
 
 
     # getters for Bitmex Data stored from websocket stream
-    async def get_position_data(self):
-        """Get position data and return it as an object organized into closed and open positions."""
-        pos_data = {
-            'closed': [],
-            'open': []
-        }
-        for p in self.position_data:
-            if p['isOpen'] == False:
-                pos_data['closed'].append(p)
-            else:
-                pos_data['open'].append(p)
-        
-        return pos_data
-        
+    def get_positions(self):
+        """Returns position data as dict, 'closed' and 'open'"""
+        return self.position_data
 
-    async def get_wallet_amount(self):
-        """Returns amount available in wallet."""
+
+    def get_open_positions_qty(self):
+        """Returns current quantity of open positions, or None if you dont have any."""
+        open_positions = self.position_data['open']
+        if open_positions:
+            quantity = open_positions['currentQty']
+            return quantity
+        return None
+
+
+    def get_wallet_amount(self):
+        """Returns amount available in Bitmex wallet."""
         return self.wallet_data[0]['amount']
 
 
-    async def get_margin_data(self):
-        """Returns last stroed margin data."""
+    def get_margin_data(self):
+        """Returns margin data from bitmex websocket."""
         return self.margin_data[0]
 
 
-    async def get_order_data(self):
+    def get_order_data(self):
         # NOT IN USE YET
         print("ORD")
         print(self.order_data)
 
 
-    async def get_trading_price(self):
-        """Return price from last trade stored from websocket."""
-        return self.trade_data[0]['price']
+    def get_last_trade_price(self):
+        """Returns price from last trade on Bitmex."""
+        return self.trade_data[len(self.trade_data) - 1]['price']
 
 
     # WEBSOCKETS
@@ -130,7 +133,8 @@ class BitMEX:
 
     async def get_all_info(self):
         """Gets position, margin, order, wallet, and trade data via websocket."""
-        args = ["position","margin","wallet","order","trade:XBTUSD","execution"]
+        trade = "trade:" + self.symbol
+        args = ["position","margin","wallet","order",trade,"execution"]
         await self.ws_subscribe(args)
        
 
@@ -153,6 +157,8 @@ class BitMEX:
     
     async def interpret_msg_type(self, response, id):
         """Gets response from websocket and returns type of response, ie table, info, success, error."""
+        print('bitmex ws response', response)
+
         if 'info' in response:
             print(c[1] + f"\n{response['info']} Limit : {response['limit']}" + c[0]) 
             return 'INFO'
@@ -172,201 +178,41 @@ class BitMEX:
         data = json.loads(raw_data)
         if(data['table'] == 'position'):
             if(data['data']):
-                self.position_data = data['data']
+                if data['data'][0]['isOpen']:
+                    self.position_data.closed = data['data'][0]
+                else:
+                    self.position_data.open = data['data'][0] 
 
         elif(data['table'] == 'wallet'):
-            self.wallet_data = data['data']
+            print('wallet', data['data'])
+            self.wallet_data = data['data'][0]
 
         elif(data['table'] == 'margin'):
+            print('margin', data)
             if(data['data']):
+                print('margin', data['data'])
                 self.margin_data = data['data']
 
         elif(data['table'] == 'order'):
+            print('order', data)
             if(data['data']):
-                self.order_data = data['data']
+                print('order', data['data'])
+                self.order_data.append(data['data'][0])
 
         elif(data['table'] == 'trade'):
+            print('trade', data)
             if(data['data']):
-                self.trade_data = data['data']
+                print('trade', data['data'])
+                self.trade_data.append(data['data'][0])
 
         elif(data['table'] == 'execution'):
+            print('exe', data)
             if(data['data']):
-                self.execution_data = data['data']
-
+                print('execution', data['data'])
+                self.execution_data.append(data['data'][0])
 
 
     # REST API 
-    async def make_order(self, quantity, price=None, side=None, orderType=None, displayQty=None, stopPx=None, pegOffsetValue=None, pegPriceType=None, timeInForce=None, execInst=None):
-        """
-            Returns an order object ready to use in bulk or single order. 
-            Must supply quantity. 
-            If no price supplied, order is market sell or buy.
-            side is either 'Buy' or 'Sell'
-            displayQty of 0 hides order
-            stopPx, optional trigger price, use a price below the current price for stop-sell orders and buy-if-touched orders
-        """
-        if price and price < 0:
-            raise Exception(c[2] + "Order Price must be positive." + c[0])
-
-        if not quantity:
-            raise Exception(c[2] + "Must supply order quantity." + c[0])
-
-        if side and side != 'Sell' and side != 'Buy':
-            raise Exception(c[2] + "Side must be 'Sell' or 'Buy'." + c[0])
-
-        if orderType and (
-            orderType != 'Market' or
-            orderType != 'Limit' or
-            orderType != 'Stop' or 
-            orderType != 'StopLimit' or
-            orderType != 'MarketIfTouched' or
-            orderType != 'LimitIfTouched' or
-            orderType != 'Pegged'
-        ):
-            raise Exception(c[2] + "orderType must be Market, Limit, Stop, StopLimit, MarketIfTouched, LimitIfTouched, or Pegged" + c[0])
-
-        if displayQty and displayQty < 0:
-            raise Exception(c[2] + "DisplayQty is negative, must be 0 to hide order or positive." + c[0])
-        
-        if pegPriceType and (
-            pegPriceType != 'LastPeg' or 
-            pegPriceType != 'MidPricePeg' or 
-            pegPriceType != 'MarketPeg' or 
-            pegPriceType != 'PrimaryPeg' or 
-            pegPriceType != 'TrailingStopPeg'
-        ):
-            raise Exception(c[2] + "pegPriceType must be LastPeg, MidPricePeg, MarketPeg, PrimaryPeg, or TrailingStopPeg." + c[0])
-
-        if timeInForce and (
-            timeInForce != 'Day' or 
-            timeInForce != 'GoodTillCancel' or 
-            timeInForce != 'ImmediateOrCancel' or 
-            timeInForce != 'FillOrKill'
-        ):
-            raise Exception(c[2] + "timeInForce must be Day, GoodTillCancel, ImmediateOrCancel, or FillOrKill" + c[0])
-        
-        if execInst and (
-            execInst != 'ParticipateDoNotInitiate' or 
-            execInst != 'AllOrNone' or 
-            execInst != 'MarkPrice' or 
-            execInst != 'IndexPrice' or 
-            execInst != 'LastPrice' or 
-            execInst != 'Close' or 
-            execInst != 'ReduceOnly' or 
-            execInst != 'Fixed'
-        ):
-            raise Exception(c[2] + "execInst must be ParticipateDoNotInitiate, AllOrNone, MarkPrice, IndexPrice, LastPrice, Close, ReduceOnly, or Fixed." + c[0])
-        
-        if execInst and execInst == 'AllOrNone' and displayQty != 0:
-            raise Exception(c[2] + "execInst is 'AllOrNone', displayQty must be 0" + c[0])
-
-        # Generate a unique clOrdID with our prefix so we can identify it.
-        clOrdID = self._orderIDPrefix + base64.b64encode(uuid.uuid4().bytes).decode('utf8').rstrip('=\n')
-        order = {
-            'symbol': self.symbol,
-            'orderQty': quantity,
-            'clOrdID': clOrdID,
-            'side': side
-        }
-        # add to order if supplied 
-        if price:           order['price'] = price
-        if displayQty:      order['displayQty'] = displayQty
-        if stopPx:          order['stopPx'] = stopPx
-        if pegOffsetValue:  order['pegOffsetValue'] = pegOffsetValue
-        if timeInForce:     order['timeInForce'] = timeInForce
-        if execInst:        order['execInst'] = execInst
-        if orderType:       order['ordType'] = orderType
-
-        return order
-
-
-    async def market_buy(self, quantity):
-        '''
-        Buy at market price. 
-        Returns order object. ID: orderID
-        '''
-        side="Buy"
-        order = await self.make_order(
-            quantity=quantity, 
-            side=side, 
-        )
-        return await self.place_order(order)
-
-
-    async def market_sell(self, quantity):
-        '''
-        Sell at market price.
-        Returns order object. ID: orderID
-        '''
-        side="Sell"
-        order = await self.make_order(
-            quantity=quantity, 
-            side=side, 
-        )
-        return await self.place_order(order)
-    
-
-    async def limit_buy(self, quantity, price):
-        '''Place a limit buy order.
-        Returns order object ID: orderID
-        '''
-        side = "Buy"
-        order = await self.make_order(
-            quantity=quantity, 
-            price=price,
-            side=side, 
-        )
-        return await self.place_order(order)
-
-    
-    async def short(self, quantity, price):
-        """Place a short order.
-        Returns order object. ID: orderID
-        """
-        side="Sell"
-        order = await self.make_order(
-            quantity=quantity, 
-            price=price,
-            side=side, 
-        )
-        return await self.place_order(order)
-
-
-    async def stop_order(self, quantity, stopPx, price=None, execInst=None):
-        '''Place stop order.
-        Use a price below the current price for stop-sell orders and buy-if-touched orders. 
-        Use execInst of 'MarkPrice' or 'LastPrice' to define the current price used for triggering.
-        '''
-        order = await self.make_order(
-            quantity=quantity, 
-            stopPx=stopPx,
-            price=price,
-            execInst=execInst
-        )
-        return await self.place_order(order)
-
-    
-    async def close(self, quantity=None, side=None):
-        '''
-        cancel other active limit orders with the same side and symbol if the open quantity exceeds the current position.
-        Side or quantity required.
-
-        '''
-        if quantity == None and side == None:
-            raise Exception(c[2] + "Side or quantity required to close." + c[0])
-
-        clOrdID = self._orderIDPrefix + base64.b64encode(uuid.uuid4().bytes).decode('utf8').rstrip('=\n')
-        order = {
-            'symbol': self.symbol,
-            'clOrdID': clOrdID,
-            'execInst': 'Close'
-        }
-        if quantity: order['orderQty'] = quantity,
-        if side: order['side'] = side
-
-        return await self.place_order(order)
-
-
     async def place_order(self, order):
         '''
             Send single order. 

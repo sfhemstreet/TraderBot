@@ -20,11 +20,10 @@ class TokenAnalyst:
         self._ws = None
 
 
-    async def connect(self):
-        """Connects to websocket and yields inflow data."""
+    async def connect(self, channel="btc_confirmed_exchange_flows"):
+        """Connects to websocket and yields blockchain data. Default channel is 'btc_confirmed_exchange_flows'"""
         uri = "wss://ws.tokenanalyst.io"
         id = "token_analyst_stream"
-        channel = "btc_confirmed_exchange_flows"
         payload = {"event":"subscribe","channel":channel,"id":id,"key":self._key}
 
         async with websockets.connect(uri) as websocket:
@@ -36,6 +35,7 @@ class TokenAnalyst:
 
 
     async def close(self):
+        """ Close Token Anaylst websocket"""
         await self._ws.close()
         print(c[3] + '\nTokenAnalyst connection closed' + c[0])
 
@@ -53,17 +53,17 @@ class TokenAnalyst:
             
 
     async def on_data(self, data): 
-        if(data['flowType'] == 'Inflow'):
-            #print(data)
-            return data
+        return data
 
 
     async def on_heartbeat(self, heartbeat):
         print(c[1] + "\nToken Analyst heartbeat - server time: " + str(heartbeat['serverTime']) + c[0]) 
+        return None
 
 
     async def on_subscribed(self, details):
         print(c[1] + "\nToken Analyst connection successful. " + str(details['message']) + c[0])
+        return None
 
 
     async def on_error(self, error):
@@ -71,3 +71,85 @@ class TokenAnalyst:
         await self.close()
         sys.exit(1)
 
+
+    def check_for_inflow_value(self, data, threshold=None, exchange='Bitmex'):
+        """
+        Checks Token Analyst data for Inflow.
+        Returns -1 or the inflow value.
+        Supply 'threshold' value to filter results to those above threshold
+        supply 'exchange' value to filter by exchange, default is Bitmex 
+        (Valid exchange values are All, Binance, Bitmex, Bitfinex, Bittrex, Kraken, Poloniex, and Huobi)
+        """
+        value = self._inflow_outflow_check(data=data, threshold=threshold, exchange=exchange, check_flowtype='Inflow')
+        return value
+
+    
+    def check_for_outflow_value(self, data, threshold=None, exchange='Bitmex'):
+        """
+        Checks Token Analyst data for Outflow.
+        Returns -1 or the outflow value.
+        Supply 'threshold' value to filter results to those above threshold
+        supply 'exchange' value to filter by exchange, default is Bitmex 
+        (Valid exchange values are All, Binance, Bitmex, Bitfinex, Bittrex, Kraken, Poloniex, and Huobi)
+        """
+        value = self._inflow_outflow_check(data=data, threshold=threshold, exchange=exchange, check_flowtype='Outflow')
+        return value
+
+
+    def _inflow_outflow_check(self, data, check_flowtype, threshold, exchange):
+        '''used for check_for_outflow_value() and check_for_inflow_value()'''
+        flowType = data['flowType']
+        value = data['value']
+        to = data['to'][0]
+
+        if flowType != check_flowtype:
+            return -1
+
+        if threshold and value < threshold:
+            return -1
+
+        if exchange != 'All' and exchange != to:
+            return -1
+
+        return value
+
+
+
+    def get_transactionId(self, data):
+        transactionId = data['transactionId']
+        return transactionId
+
+
+    def get_blockHash(self, data):
+        blockHash = data['blockHash']
+        return blockHash
+
+
+    def get_blockNumber(self, data):
+        blockNumber = data['blockNumber']
+        return blockNumber
+
+
+    def get_timestamp(self, data):
+        timestamp = data['timestamp']
+        return timestamp
+
+
+    def get_from(self, data):
+        from_data = data['from'][0]
+        return from_data
+
+
+    def get_to(self, data):
+        to = data['to'][0]
+        return to
+
+
+    def get_value(self, data):
+        value = data['value']
+        return value
+
+
+    def get_flowtype(self, data):
+        flowType = data['flowType']
+        return flowType

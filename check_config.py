@@ -40,6 +40,11 @@ def check_config():
         raise Exception(c[2] + "\nINVALID BITMEX API SECRET\n" + c[0])
 
 
+    # get user input to set DEFAULT_SYMBOL if not declared globally (ie XBTUSD)
+    if G_DEFAULT_SYMBOL == None:
+        raise Exception(c[2] + "\nSET G_DEFAULT_SYMBOL IN CONFIG ie 'XBTUSD'")
+
+
     # get user input to set THRESHOLD if not declared globally (float > 0)
     if G_INFLOW_THRESHOLD == None:
         INFLOW_THRESHOLD = float(input(c[3] + 
@@ -81,4 +86,4 @@ def check_config():
     
 
 
-    return (TOKEN_ANALYST_API_KEY, BITMEX_API_KEY, BITMEX_API_SECRET, TRADE_QUANTITY, PORTFOLIO_PERCENTAGE, INFLOW_THRESHOLD)
+    return (TOKEN_ANALYST_API_KEY, BITMEX_API_KEY, BITMEX_API_SECRET)
