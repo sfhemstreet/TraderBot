@@ -18,7 +18,7 @@ To Run
 - Install requirements: pip install -r requirements.txt
 - open config.py 
     - enter API keys 
-        - you can optionally save your API keys as enviroment variables
+        - you can optionally save your API keys as environment variables
     - enter trading variables
 - in TraderBot.py edit the traderBot function with your own trade logic
 - run TraderBot.py
