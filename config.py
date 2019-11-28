@@ -18,6 +18,9 @@ G_BITMEX_API_SECRET =     'SECRET'
     Optional - if not filled out here you will have to input 
     them manually every time.
 '''
+# defualt symbol for trades 
+G_DEFAULT_SYMBOL = 'XBTUSD'
+
 # set Inflow threshold to base trades off of (float > 0)
 G_INFLOW_THRESHOLD = None
 
