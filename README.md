@@ -20,7 +20,7 @@ To Run
     - enter API keys 
         - you can optionally save your API keys as enviroment variables
     - enter trading variables
-- fill in my_trade_function with your own trade logic
+- in TraderBot.py edit the traderBot function with your own trade logic
 - run TraderBot.py
 
 
