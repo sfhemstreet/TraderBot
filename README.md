@@ -1,6 +1,6 @@
 # TraderBot
 
-Project to test reading BitMEX inflow data from
+Project to test reading on-chain data from
 Token Analyst's websocket to trigger trades on the
 BitMEX exchange.
 
