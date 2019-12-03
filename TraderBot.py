@@ -21,7 +21,7 @@ def main():
         # use trade to make order objects 
             # ie -  my_order = trade.limit_buy(quantity, price)
         # use bitmex to submit orders 
-            # ie -  order_info = bitmex.place_order(my_order)
+            # ie -  order_info = await bitmex.place_order(my_order)
         # use token_analyst to check for inflow / outflow 
             # ie -  result = token_analyst.chech_for_inflow(data, threshold?, exchange?)
 
@@ -45,7 +45,7 @@ def main():
         if result:
             # the data is an Inflow and is above our threshold 
             # lets see if we have any positions open that we might want to sell
-            position = bitmex.get_latest_position()
+            position = bitmex.get_last_position()
 
             if position:
                 position_qty = position['currentQty']
@@ -54,7 +54,7 @@ def main():
 
                     # lets sell a little below the market price, 
                     # note that price must be integer or .5, otherwise you will get a tickSize error 
-                    price = 1222.12 # int(position['markPrice'] - 1)
+                    price = int(position['markPrice'] - 1)
 
                     # make an order
                     sell_order = trade.limit_sell(quantity=position_qty, price=price)
@@ -69,7 +69,7 @@ def main():
 
             if last_price:
                 # important! make sure price is integer or .5, otherwise you will get a tickSize error  
-                short_price = 1200.12 #int(last_price - 100)
+                short_price = int(last_price - 100)
                 short_order = trade.limit_sell(quantity=10, price=short_price)
                 short_order_details = await bitmex.place_order(short_order)
 
