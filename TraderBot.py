@@ -6,6 +6,7 @@ logging.basicConfig(filename="test.log", level=logging.DEBUG)
 from BitMEX import BitMEX
 from TokenAnalyst import TokenAnalyst
 import trade
+from config import *
 from check_config import check_config
 from colors import c
 
@@ -24,7 +25,9 @@ def main():
         #   or open a short position if we do not
         #---------------------------------------
 
-        inflow_threshold = 100
+        print(data)
+
+        inflow_threshold = 0.00001
 
         # using token_analyst method 'check_for_inflow_value'
         # check if data is an inflow
@@ -34,35 +37,35 @@ def main():
         if result:
             # the data is an Inflow and is above our threshold 
             # lets see if we have any positions open that we might want to sell
-            open_positions_qty = bitmex.get_open_positions_qty()
+            position = bitmex.get_latest_position()
 
-            # lets also get the last trade price
-            last_price = bitmex.get_last_trading_price()
+            if position:
+                position_qty = position['currentQty']
 
-            # check if we have any open positions
-            # if we do lets use limit sell to sell when the price goes a little below current market 
-            # if we dont have any positions open lets open a short position with the same function
-            if open_positions_qty > 0:
+                if position_qty > 0:
 
-                # lets sell a little below the last trading price 
-                price = last_price - 1
+                    # lets sell a little below the market price, 
+                    # note that price must be integer or .5, otherwise you will get a tickSize error 
+                    price = 1222.12 # int(position['markPrice'] - 1)
 
-                # make an order
-                sell_order = trade.limit_sell(quantity=open_positions_qty, price=price)
+                    # make an order
+                    sell_order = trade.limit_sell(quantity=position_qty, price=price)
 
-                # send to bitmex, 
-                # we get back the order details that we can use to ammend/cancel/keep tarck of the order
-                order_details = await bitmex.place_order(sell_order)
+                    # send to bitmex, 
+                    # we get back the order details that we can use to ammend/cancel/track the order
+                    order_details = await bitmex.place_order(sell_order)
+                    
+                    return
+                
+            last_price = bitmex.get_last_trade_price()
 
-            else:
-                short_price = last_price - 100
+            if last_price:
+                # important! make sure price is integer or .5, otherwise you will get a tickSize error  
+                short_price = 1200.12 #int(last_price - 100)
                 short_order = trade.limit_sell(quantity=10, price=short_price)
                 short_order_details = await bitmex.place_order(short_order)
 
         
-        # right now getting some funky results from bitmex websocket
-        # probably has to do with changes on their end, (ie symbol / index changes, websocket response changes)
-        # gonna wait a little a see if they fix there stuff 
 
 
     # End trader_bot 
@@ -78,7 +81,7 @@ def main():
     token_analyst = TokenAnalyst(TOKEN_ANALYST_API_KEY)
 
     # init BitMEX with api-key and secret (supply 'base_url' to do real trades, default is testnet url) 
-    bitmex = BitMEX(key=BITMEX_API_KEY, secret=BITMEX_API_SECRET)
+    bitmex = BitMEX(key=BITMEX_API_KEY, secret=BITMEX_API_SECRET, symbol=G_DEFAULT_BITMEX_SYMBOL, base_url=G_DEFAULT_BITMEX_BASE_URL, ws_url=G_DEFAULT_BITMEX_WS_URL )
 
     # create asyncio event loop
     loop = asyncio.get_event_loop() 

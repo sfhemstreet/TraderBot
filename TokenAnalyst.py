@@ -26,7 +26,7 @@ class TokenAnalyst:
         id = "token_analyst_stream"
         payload = {"event":"subscribe","channel":channel,"id":id,"key":self._key}
 
-        async with websockets.connect(uri) as websocket:
+        async with websockets.connect(uri, ping_timeout=None) as websocket:
             self._ws = websocket
             await websocket.send(json.dumps(payload))
             async for msg in websocket: 
@@ -50,6 +50,7 @@ class TokenAnalyst:
             return await self.on_subscribed(response['data'])
         if(response['event'] == 'error' and response['data']['success'] == False):
             return await self.on_error(response['data'])
+        return None
             
 
     async def on_data(self, data): 
@@ -72,7 +73,7 @@ class TokenAnalyst:
         sys.exit(1)
 
 
-    def check_for_inflow_value(self, data, threshold=None, exchange='Bitmex'):
+    def check_for_inflow(self, data, threshold=None, exchange='Bitmex'):
         """
         Checks Token Analyst data for Inflow.
         Returns -1 or the inflow value.
@@ -84,7 +85,7 @@ class TokenAnalyst:
         return value
 
     
-    def check_for_outflow_value(self, data, threshold=None, exchange='Bitmex'):
+    def check_for_outflow(self, data, threshold=None, exchange='Bitmex'):
         """
         Checks Token Analyst data for Outflow.
         Returns -1 or the outflow value.
