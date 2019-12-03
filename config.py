@@ -15,15 +15,13 @@ G_BITMEX_API_SECRET =     'SECRET'
 
 ''' 
     Global Trading Variables
-    Optional - if not filled out here you will have to input 
-    them manually every time.
 '''
-# default symbol for trades 
+# default symbol for trades - see Bitmex API docs for other valid symbols
 G_DEFAULT_BITMEX_SYMBOL = "XBTUSD"
 
-# default bitmex websocket is set to testnet, change to make real trades 
-G_DEFAULT_BITMEX_WS_URL = "wss://testnet.bitmex.com" # for real trades use "wss://www.bitmex.com"
+# default is testnet, change to make real trades 
+G_DEFAULT_BITMEX_WS_URL = "wss://testnet.bitmex.com" # REAL TRADES -> "wss://www.bitmex.com"
 
-# default bitmex REST API url is set to testnet, change to make real trades
-G_DEFAULT_BITMEX_BASE_URL = "https://testnet.bitmex.com/api/v1/" # for real trades use "https://www.bitmex.com/api/v1"
+# default is testnet, change to make real trades
+G_DEFAULT_BITMEX_BASE_URL = "https://testnet.bitmex.com/api/v1/" # REAL TRADES -> "https://www.bitmex.com/api/v1/"
 

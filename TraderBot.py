@@ -5,7 +5,7 @@ logging.basicConfig(filename="test.log", level=logging.DEBUG)
 
 from BitMEX import BitMEX
 from TokenAnalyst import TokenAnalyst
-import trade
+from Trade import Trade
 from config import *
 from check_config import check_config
 from colors import c
@@ -15,8 +15,16 @@ def main():
     # ---------- Your code here ---------- #
     async def trader_bot(data):
         """
-        Recieves blockchain data from Token Analyst websocket 
+        User trade function, fill in with trade logic.
+        Recieves blockchain data from Token Analyst websocket.  
         """
+        # use trade to make order objects 
+            # ie -  my_order = trade.limit_buy(quantity, price)
+        # use bitmex to submit orders 
+            # ie -  order_info = bitmex.place_order(my_order)
+        # use token_analyst to check for inflow / outflow 
+            # ie -  result = token_analyst.chech_for_inflow(data, threshold?, exchange?)
+
         
         # Example Code -
         #   in this example we will trigger a trade based on Inflows over a certain value.
@@ -25,14 +33,14 @@ def main():
         #   or open a short position if we do not
         #---------------------------------------
 
-        print(data)
+        print(c[3] + '\nData from Token Analyst - \n' + c[0], data)
 
-        inflow_threshold = 0.00001
+        inflow_threshold = 100
 
-        # using token_analyst method 'check_for_inflow_value'
+        # using token_analyst method 'check_for_inflow'
         # check if data is an inflow
         # here we will supply a threshold to filter results to only those above our inflow_threshold 
-        result = token_analyst.check_for_inflow_value(data=data, threshold=inflow_threshold)
+        result = token_analyst.check_for_inflow(data=data, threshold=inflow_threshold)
 
         if result:
             # the data is an Inflow and is above our threshold 
@@ -82,6 +90,9 @@ def main():
 
     # init BitMEX with api-key and secret (supply 'base_url' to do real trades, default is testnet url) 
     bitmex = BitMEX(key=BITMEX_API_KEY, secret=BITMEX_API_SECRET, symbol=G_DEFAULT_BITMEX_SYMBOL, base_url=G_DEFAULT_BITMEX_BASE_URL, ws_url=G_DEFAULT_BITMEX_WS_URL )
+
+    # init Trade with symbol
+    trade = Trade(symbol=G_DEFAULT_BITMEX_SYMBOL)
 
     # create asyncio event loop
     loop = asyncio.get_event_loop() 
