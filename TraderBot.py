@@ -20,7 +20,7 @@ def main():
         """
         # use trade to make order objects 
             # ie -  my_order = trade.limit_buy(quantity, price)
-        # use bitmex to submit orders 
+        # use bitmex to submit orders - note that you must use await keyword 
             # ie -  order_info = await bitmex.place_order(my_order)
         # use token_analyst to check for inflow / outflow 
             # ie -  result = token_analyst.chech_for_inflow(data, threshold?, exchange?)
@@ -35,7 +35,7 @@ def main():
 
         print(c[3] + '\nData from Token Analyst - \n' + c[0], data)
 
-        inflow_threshold = 100
+        inflow_threshold = 0.00000000001
 
         # using token_analyst method 'check_for_inflow'
         # check if data is an inflow
@@ -93,6 +93,9 @@ def main():
 
     # init Trade with symbol
     trade = Trade(symbol=G_DEFAULT_BITMEX_SYMBOL)
+
+    # keep track of last trade to avoid rate limit
+    last_bitmex_trade = None
 
     # create asyncio event loop
     loop = asyncio.get_event_loop() 

@@ -2,6 +2,7 @@ from colors import c
 import base64
 import uuid
 from config import G_DEFAULT_BITMEX_SYMBOL # if you dont have this declared in config go do that
+from Exceptions import InvalidArgError
 
 '''
     TRADE
@@ -95,7 +96,7 @@ class Trade:
             orderIDPrefix = self.orderIDPrefex
 
         if quantity == None and side == None:
-            raise Exception(c[2] + "Side or quantity required to close." + c[0])
+            raise InvalidArgError([quantity, side],"Side or quantity required to close.")
 
         clOrdID = orderIDPrefix + base64.b64encode(uuid.uuid4().bytes).decode('utf8').rstrip('=\n')
         order = {
@@ -136,16 +137,16 @@ class Trade:
         # Read Me - This creates all the orders below, so dont break it
 
         if price and price < 0:
-            raise Exception(c[2] + "Order Price must be positive." + c[0])
+            raise InvalidArgError(price,"Order Price must be positive.")
 
         if price:
             self.is_tickSize_valid(price)
 
         if not quantity and execInst != 'Close':
-            raise Exception(c[2] + "Must supply order quantity." + c[0])
+            raise InvalidArgError([quantity, execInst],"Must supply order quantity.")
 
         if side and side != 'Sell' and side != 'Buy':
-            raise Exception(c[2] + "Side must be 'Sell' or 'Buy'." + c[0])
+            raise InvalidArgError(side,"Side must be 'Sell' or 'Buy'.")
 
         if orderType and (
             orderType != 'Market' or
@@ -156,10 +157,10 @@ class Trade:
             orderType != 'LimitIfTouched' or
             orderType != 'Pegged'
         ):
-            raise Exception(c[2] + "orderType must be Market, Limit, Stop, StopLimit, MarketIfTouched, LimitIfTouched, or Pegged" + c[0])
+            raise InvalidArgError(orderType,"orderType must be Market, Limit, Stop, StopLimit, MarketIfTouched, LimitIfTouched, or Pegged")
 
         if displayQty and displayQty < 0:
-            raise Exception(c[2] + "DisplayQty is negative, must be 0 to hide order or positive." + c[0])
+            raise InvalidArgError(displayQty,"DisplayQty is negative, must be 0 to hide order or positive.")
         
         if pegPriceType and (
             pegPriceType != 'LastPeg' or 
@@ -168,7 +169,7 @@ class Trade:
             pegPriceType != 'PrimaryPeg' or 
             pegPriceType != 'TrailingStopPeg'
         ):
-            raise Exception(c[2] + "pegPriceType must be LastPeg, MidPricePeg, MarketPeg, PrimaryPeg, or TrailingStopPeg." + c[0])
+            raise InvalidArgError(pegPriceType,"pegPriceType must be LastPeg, MidPricePeg, MarketPeg, PrimaryPeg, or TrailingStopPeg.")
 
         if timeInForce and (
             timeInForce != 'Day' or 
@@ -176,7 +177,7 @@ class Trade:
             timeInForce != 'ImmediateOrCancel' or 
             timeInForce != 'FillOrKill'
         ):
-            raise Exception(c[2] + "timeInForce must be Day, GoodTillCancel, ImmediateOrCancel, or FillOrKill" + c[0])
+            raise InvalidArgError(timeInForce,"timeInForce must be Day, GoodTillCancel, ImmediateOrCancel, or FillOrKill")
         
         if execInst and (
             execInst != 'ParticipateDoNotInitiate' or 
@@ -188,10 +189,10 @@ class Trade:
             execInst != 'ReduceOnly' or 
             execInst != 'Fixed'
         ):
-            raise Exception(c[2] + "execInst must be ParticipateDoNotInitiate, AllOrNone, MarkPrice, IndexPrice, LastPrice, Close, ReduceOnly, or Fixed." + c[0])
+            raise InvalidArgError(execInst,"execInst must be ParticipateDoNotInitiate, AllOrNone, MarkPrice, IndexPrice, LastPrice, Close, ReduceOnly, or Fixed.")
         
         if execInst and execInst == 'AllOrNone' and displayQty != 0:
-            raise Exception(c[2] + "execInst is 'AllOrNone', displayQty must be 0" + c[0])
+            raise InvalidArgError([execInst, displayQty],"execInst is 'AllOrNone', displayQty must be 0" + c[0])
 
         if symbol == None:
             symbol = self.symbol
@@ -221,6 +222,7 @@ class Trade:
 
     def is_tickSize_valid(self,price):
         """Check for valid tickSize, ie if the price is an integer or .5 away."""
-        if not isinstance(price, int) or not isinstance(price + 0.5, int):
-            raise Exception(c[2] + "Invalid Tick Size! Prices must be set at integer or .5 between" + c[0])
+        if not isinstance(price, int):
+            if not isinstance(price + 0.5, int):
+                raise InvalidArgError(price,"Invalid Tick Size! Prices must be set at integer or .5 between")
         

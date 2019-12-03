@@ -3,6 +3,7 @@ import os
 import json
 import asyncio
 import sys
+from Exceptions import WebSocketError
 
 
 # ANSI colors
@@ -68,6 +69,7 @@ class TokenAnalyst:
 
 
     async def on_error(self, error):
+        raise WebSocketError(error, error['message'])
         print(c[2] + "\nTokenAnalyst error - " + error['message'] + c[0])
         await self.close()
         sys.exit(1)
@@ -88,7 +90,7 @@ class TokenAnalyst:
     def check_for_outflow(self, data, threshold=None, exchange='Bitmex'):
         """
         Checks Token Analyst data for Outflow.
-        Returns -1 or the outflow value.
+        Returns 0 or the outflow value.
         Supply 'threshold' value to filter results to those above threshold.
         Supply 'exchange' value to filter by exchange, default is Bitmex. 
         (Valid exchange values are All, Binance, Bitmex, Bitfinex, Bittrex, Kraken, Poloniex, and Huobi)
@@ -101,16 +103,16 @@ class TokenAnalyst:
         '''used for check_for_outflow_value() and check_for_inflow_value()'''
         flowType = data['flowType']
         value = data['value']
-        to = data['to'][0]
+        to = data['to']
 
         if flowType != check_flowtype:
-            return -1
+            return 0
 
         if threshold and value < threshold:
-            return -1
+            return 0
 
         if exchange != 'All' and exchange != to:
-            return -1
+            return 0
 
         return value
 

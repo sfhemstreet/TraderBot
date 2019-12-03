@@ -12,6 +12,7 @@ import uuid
 import logging
 import bitmex_helpers
 from collections import deque
+from Exceptions import WebSocketError, InvalidArgError
 
 
 # ANSI colors
@@ -129,7 +130,7 @@ class BitMEX:
                     args = await self.get_all_info() 
                     await self.ws_subscribe(args)
                 elif msg_type == 'ERROR':
-                    raise Exception(c[2] + "\nERROR CONNECTING TO BITMEX WEBSOCKET" + c[0])
+                    raise WebSocketError(json.loads(raw_msg),"ERROR CONNECTING TO BITMEX WEBSOCKET")
                     return
          
 
@@ -152,7 +153,7 @@ class BitMEX:
             elif msg_type == 'SUCCESS':
                 pass
             elif msg_type == 'ERROR':
-                raise Exception(c[2] + "\nERROR SUBSCRIBING TO BITMEX WEBSOCKET" + c[0])
+                raise WebSocketError(json.loads(raw_msg),"ERROR SUBSCRIBING TO BITMEX WEBSOCKET")
             elif msg_type == 'TABLE':
                 await self.store_table_info(json.loads(raw_msg))
             
@@ -214,7 +215,7 @@ class BitMEX:
     async def place_bulk_order(self, orders):
         """Place a bulk order via REST API."""
         if len(orders) < 1:
-            raise Exception(c[2] + "Orders must be more than 1 order." + c[0])
+            raise InvalidArgError(orders, "Orders must be more than 1 order.")
 
         endpoint = "order/bulk"
         allOrders = {'orders': orders}
@@ -224,7 +225,7 @@ class BitMEX:
     async def cancel_order(self, orderID=None, clOrdID=None, text=None):
         """Cancel an existing order(s) by submitting orderID(s) or clOrdID(s) (as a string). Supply optional text to annotate cancellation."""
         if orderID == None and clOrdID == None:
-            raise Exception(c[2] + "Must submit either orderID or clOrdID to cancel order(s)." + c[0])
+            raise InvalidArgError([orderID, clOrdID], "Must submit either orderID or clOrdID to cancel order(s).")
 
         path = "order"
         postdict = {}
@@ -265,7 +266,7 @@ class BitMEX:
         A leavesQty can be used to make a "Filled" order live again, if it is received within 60 seconds of the fill.
         """
         if orderID == None and origClOrdID == None:
-            raise Exception(c[2] + "Must submit either orderID or origClOrdID to amend order(s)." + c[0])
+            raise InvalidArgError([orderID, origClOrdID], "Must submit either orderID or origClOrdID to amend order(s).")
         
         path = "order"
         postdict = {}
@@ -448,7 +449,7 @@ class BitMEX:
 
                 # We're ratelimited, and we may be waiting for a long time. Cancel orders.
                 logging.warning("Canceling all known orders in the meantime.")
-                self.cancel([o['orderID'] for o in self.get_orders()])
+                self.cancel_all_orders(text="RateLimited Cancel")
 
                 logging.error("Your ratelimit will reset at %s. Sleeping for %d seconds." % (reset_str, to_sleep))
                 asyncio.sleep(to_sleep)
