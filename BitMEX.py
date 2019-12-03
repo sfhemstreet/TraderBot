@@ -70,7 +70,7 @@ class BitMEX:
         return self.position_data
 
     
-    def get_latest_position(self):
+    def get_last_position(self):
         """Returns latest position data or None."""
         if self.position_data:
             return self.position_data[-1]
@@ -84,14 +84,14 @@ class BitMEX:
         return None
 
 
-    def get_latest_margin_data(self):
+    def get_last_margin_data(self):
         """Returns latest margin data or None."""
         if self.margin_data:
             return self.margin_data[-1]
         return None
 
 
-    def get_latest_order_data(self):
+    def get_last_order_data(self):
         """Returns latest order data or None."""
         if self.order_data:
             return self.order_data[-1]
@@ -221,17 +221,158 @@ class BitMEX:
         return await self._http_request(path=endpoint, postdict=allOrders, verb="POST")
         
 
-    async def cancel_order(self, orderID):
-        """Cancel an existing order by submitting order ID."""
+    async def cancel_order(self, orderID=None, clOrdID=None, text=None):
+        """Cancel an existing order(s) by submitting orderID(s) or clOrdID(s) (as a string). Supply optional text to annotate cancellation."""
+        if orderID == None and clOrdID == None:
+            raise Exception(c[2] + "Must submit either orderID or clOrdID to cancel order(s)." + c[0])
+
         path = "order"
-        postdict = {
-            'orderID': orderID,
-        }
+        postdict = {}
+        if orderID:   postdict['orderID'] = orderID
+        elif clOrdID: postdict['clOrdID'] = clOrdID
+        if text:      postdict['text'] = text
+
         return await self._http_request(path=path, postdict=postdict, verb="DELETE")
 
 
+    async def cancel_all_orders(self, symbol=None, cancel_filter=None, text=None):
+        """
+        Cancel all orders. 
+        symbol - optional, if supplied only cancels order of that symbol.
+        cancel_filter - optional, optional filter for cancellation, use to only cancel some orders, e.g. {"side": "Buy"}
+        text - supply optional text to annotate cancellation.
+        """
+        path = "order/all"
+        postdict = {}
+        if symbol:          postdict['symbol'] = symbol
+        if cancel_filter:   postdict['filter'] = cancel_filter
+        if text:            postdict['text']   = text
+
+        if postdict: 
+            return await self._http_request(path=path, postdict=postdict, verb="DELETE")
+        else: 
+            return await self._http_request(path=path, verb="DELETE")
+
+
+
+    async def amend_order(self, orderID=None, origClOrdID=None, clOrdID=None, orderQty=None, leavesQty=None, price=None, stopPx=None, pegOffsetValue=None, text=None):
+        """
+        Amend the quantity or price of an open order.
+        Send an orderID or origClOrdID to identify the order you wish to amend.
+        Both order quantity and price can be amended. Only one qty field can be used to amend.
+        Use the leavesQty field to specify how much of the order you wish to remain open. 
+        This can be useful if you want to adjust your position's delta by a certain amount, regardless of how much of the order has already filled.
+        A leavesQty can be used to make a "Filled" order live again, if it is received within 60 seconds of the fill.
+        """
+        if orderID == None and origClOrdID == None:
+            raise Exception(c[2] + "Must submit either orderID or origClOrdID to amend order(s)." + c[0])
+        
+        path = "order"
+        postdict = {}
+
+        if orderID:         postdict['orderID']         = orderID
+        if origClOrdID:     postdict['origClOrdID']     = origClOrdID
+        if clOrdID:         postdict['clOrdID']         = clOrdID
+        if orderQty:        postdict['orderQty']        = orderQty
+        if leavesQty:       postdict['leavesQty']       = leavesQty
+        if price:           postdict['price']           = price
+        if stopPx:          postdict['stopPx']          = stopPx
+        if pegOffsetValue:  postdict['pegOffsetValue']  = pegOffsetValue
+        if text:            postdict['text']            = text
+
+        return await self._http_request(path=path, postdict=postdict, verb='PUT')
+
+
+    async def amend_bulk_order(self, orders):
+        """Amend multiple orders for the same symbol, supply array of orders."""
+        path = "order/bulk"
+        postdict = {
+            'orders': orders
+        }
+        return await self._http_request(path=path, postdict=postdict, verb='PUT')
+
+
+    async def update_leverage(self, leverage, symbol=None):
+        """
+        Choose leverage for a position. 
+        Leverage value - Send a number between 0.01 and 100 to enable isolated margin with a fixed leverage. 
+        Send 0 to enable cross margin.
+        Default symbol used if not supplied.
+        """
+        if symbol == None:
+            symbol = self.symbol
+
+        path = "position/leverage"
+        postdict = {
+            'symbol': symbol,
+            'leverage': leverage
+        }
+        return await self._http_request(path=path, postdict=postdict, verb='POST')
+
+
+    async def isolated_margin(self, symbol=None):
+        """Enable isolated margin per-position. If no symbol supplied, uses default."""
+        if symbol == None:
+            symbol = self.symbol
+
+        path = "position/isolate"
+        postdict = {
+            'symbol': symbol,
+            'enabled': True
+        }
+        return await self._http_request(path=path, postdict=postdict, verb='POST')
+
+
+    async def cross_margin(self, symbol=None):
+        """Enable cross margin per-position. If no symbol supplied, uses default."""
+        if symbol == None:
+            symbol = self.symbol
+
+        path = "position/isolate"
+        postdict = {
+            'symbol': symbol,
+            'enabled': False
+        }
+        return await self._http_request(path=path, postdict=postdict, verb='POST')
+
+
+    async def transfer_margin(self, amount, symbol=None):
+        """
+        Transfer equity in or out of a position. 
+        amount - Amount to transfer, in Satoshis, May be negative.
+        symbol - Symbol of position to isolate, if no symbol supplied, uses default.
+        """
+        if symbol == None:
+            symbol = self.symbol
+        
+        path = "position/transferMargin"
+        postdict = {
+            'symbol': symbol,
+            'amount': amount
+        }
+        return await self._http_request(path=path, postdict=postdict, verb='POST')
+
+
+    async def risk_limit(self, riskLimit, symbol=None):
+        """
+        Update your risk limit. 
+        riskLimit - New Risk Limit, in Satoshis (double).
+        If no symbol supplied, uses default.
+        """
+        if symbol == None:
+            symbol = self.symbol
+
+        path = "position/riskLimit"
+        postdict = {
+            'symbol': symbol,
+            'riskLimit': riskLimit
+        }
+        return await self._http_request(path=path, postdict=postdict, verb='POST')
+
+
+
     async def _http_request(self, path, query=None, postdict=None, timeout=None, verb=None, rethrow_errors=False, max_retries=None):
-        """Send a request to BitMEX Servers."""
+        """Send a request to BitMEX Servers. Returns json response."""
         # Handle URL
         url = self.base_url + path
 
