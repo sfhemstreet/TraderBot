@@ -9,7 +9,7 @@ from config import G_DEFAULT_BITMEX_SYMBOL # if you dont have this declared in c
     add your own trade functions here or use make_order 
 '''
 
-def market_buy(self, quantity):
+def market_buy(quantity):
     '''
     returns an order to Buy at market price. 
     '''
@@ -21,7 +21,7 @@ def market_buy(self, quantity):
     return order
 
 
-def market_sell(self, quantity):
+def market_sell(quantity):
     '''
     Returns a order for Selling at market price.
     '''
@@ -33,8 +33,10 @@ def market_sell(self, quantity):
     return order
 
 
-def limit_buy(self, quantity, price):
+def limit_buy(quantity, price):
     '''Returns a limit buy order.'''
+    is_tickSize_valid(price)
+
     side = "Buy"
     order = make_order(
         quantity=quantity, 
@@ -42,10 +44,14 @@ def limit_buy(self, quantity, price):
         side=side, 
     )
     return order
+    
 
 
-def limit_sell(self, quantity, price):
+def limit_sell(quantity, price):
     """Returns a limit sell / short order."""
+
+    is_tickSize_valid(price)
+
     side="Sell"
     order = make_order(
         quantity=quantity, 
@@ -55,11 +61,14 @@ def limit_sell(self, quantity, price):
     return order
 
 
-def stop_order(self, quantity, stopPx, price=None, execInst=None):
+def stop_order(quantity, stopPx, price=None, execInst=None):
     '''Returns a stop order.
     Use a price below the current price for stop-sell orders and buy-if-touched orders. 
     Use execInst of 'MarkPrice' or 'LastPrice' to define the current price used for triggering.
     '''
+    if price:
+        is_tickSize_valid(price)
+
     order = make_order(
         quantity=quantity, 
         stopPx=stopPx,
@@ -69,7 +78,7 @@ def stop_order(self, quantity, stopPx, price=None, execInst=None):
     return order
 
 
-def close(self, quantity=None, side=None, symbol=G_DEFAULT_BITMEX_SYMBOL):
+def close(quantity=None, side=None, symbol=G_DEFAULT_BITMEX_SYMBOL, orderIDPrefix='traderbot_'):
     '''
     Returns a close order ready to send to Bitmex.
     cancel other active limit orders with the same side and symbol if the open quantity exceeds the current position.
@@ -78,7 +87,7 @@ def close(self, quantity=None, side=None, symbol=G_DEFAULT_BITMEX_SYMBOL):
     if quantity == None and side == None:
         raise Exception(c[2] + "Side or quantity required to close." + c[0])
 
-    clOrdID = self._orderIDPrefix + base64.b64encode(uuid.uuid4().bytes).decode('utf8').rstrip('=\n')
+    clOrdID = orderIDPrefix + base64.b64encode(uuid.uuid4().bytes).decode('utf8').rstrip('=\n')
     order = {
         'symbol': symbol,
         'clOrdID': clOrdID,
@@ -116,6 +125,9 @@ def make_order(
 
     if price and price < 0:
         raise Exception(c[2] + "Order Price must be positive." + c[0])
+
+    if price:
+        is_tickSize_valid(price)
 
     if not quantity and execInst != 'Close':
         raise Exception(c[2] + "Must supply order quantity." + c[0])
@@ -188,3 +200,9 @@ def make_order(
 
     return order
 
+
+def is_tickSize_valid(price):
+    """Check for valid tickSize, ie if the price is an integer or .5 away."""
+    if not isinstance(price, int) or not isinstance(price + 0.5, int):
+        raise Exception(c[2] + "Invalid Tick Size! Prices must be set at integer or .5 between" + c[0])
+    

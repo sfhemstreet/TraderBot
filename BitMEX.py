@@ -11,7 +11,7 @@ import base64
 import uuid
 import logging
 import bitmex_helpers
-from config import G_DEFAULT_BITMEX_SYMBOL, G_DEFAULT_BITMEX_WS_URL, G_DEFAULT_BITMEX_BASE_URL
+from collections import deque
 
 
 # ANSI colors
@@ -23,13 +23,14 @@ c = (
 )
 
 class BitMEX:
-    def __init__(self, key, secret, symbol=G_DEFAULT_BITMEX_SYMBOL, orderIDPrefex="traderbot_", base_url=G_DEFAULT_BITMEX_BASE_URL, ws_url=G_DEFAULT_BITMEX_WS_URL, timeout=8):
+    def __init__(self, key, secret, symbol, base_url, ws_url, orderIDPrefex="traderbot_", timeout=8):
         self.name = "Bitmex"
         self._key = key
         self._secret = secret
         self.base_url = base_url
         self.symbol = symbol
         self._ws = None
+        self._ws_url = ws_url
         self._inflow_average = 0
         self._inflow_total = 0
         self._inflow_count = 0
@@ -43,14 +44,11 @@ class BitMEX:
         self.retries = 0 
         # user / trade data
         self.wallet_data = None
-        self.position_data = {
-            'closed': None,
-            'open': None
-        }
-        self.margin_data = None
-        self.order_data = []
-        self.trade_data = []
-        self.execution_data = []
+        self.position_data = deque(maxlen=100)
+        self.margin_data = deque(maxlen=100)
+        self.order_data = deque(maxlen=100)
+        self.trade_data = deque(maxlen=100)
+        self.execution_data = deque(maxlen=100)
 
 
     def calc_inflow_average(self, new_value):
@@ -68,71 +66,77 @@ class BitMEX:
 
     # getters for Bitmex Data stored from websocket stream
     def get_positions(self):
-        """Returns position data as dict, 'closed' and 'open'"""
+        """Returns all position data."""
         return self.position_data
 
-
-    def get_open_positions_qty(self):
-        """Returns current quantity of open positions, or None if you dont have any."""
-        open_positions = self.position_data['open']
-        if open_positions:
-            quantity = open_positions['currentQty']
-            return quantity
+    
+    def get_latest_position(self):
+        """Returns latest position data or None."""
+        if self.position_data:
+            return self.position_data[-1]
         return None
 
 
     def get_wallet_amount(self):
-        """Returns amount available in Bitmex wallet."""
-        return self.wallet_data[0]['amount']
+        """Returns amount available in Bitmex wallet or None."""
+        if self.wallet_data:
+            return self.wallet_data['amount']
+        return None
 
 
-    def get_margin_data(self):
-        """Returns margin data from bitmex websocket."""
-        return self.margin_data[0]
+    def get_latest_margin_data(self):
+        """Returns latest margin data or None."""
+        if self.margin_data:
+            return self.margin_data[-1]
+        return None
 
 
-    def get_order_data(self):
-        # NOT IN USE YET
-        print("ORD")
-        print(self.order_data)
+    def get_latest_order_data(self):
+        """Returns latest order data or None."""
+        if self.order_data:
+            return self.order_data[-1]
+        return None
 
 
     def get_last_trade_price(self):
-        """Returns price from last trade on Bitmex."""
-        return self.trade_data[len(self.trade_data) - 1]['price']
+        """Returns price from last trade on Bitmex or None."""
+        if self.trade_data:
+            return self.trade_data[-1]['price']
+        return None
 
-
+    
     # WEBSOCKETS
     # Following code is for websocket connection - 
     async def connect(self):
         """Connects to Bitmex websocket."""
+       
         WS_VERB = "GET"
         WS_ENDPOINT = "/realtime"
         EXPIRES = int(round(time.time()) + 100)
-        uri = self.ws_url + WS_ENDPOINT
+        uri = str(self._ws_url + WS_ENDPOINT)
         signature = bitmex_helpers.generate_signature(self._secret, WS_VERB, WS_ENDPOINT, EXPIRES)
         id = "bitMEX_stream"
         payload = {"op": "authKeyExpires", "args": [self._key, EXPIRES, signature]}
 
-        async with websockets.connect(uri) as websocket:
+        async with websockets.connect(uri, ping_timeout=None) as websocket:
             self._ws = websocket
             await websocket.send(json.dumps(payload))
-            async for msg in websocket: 
-                msg_type = await self.interpret_msg_type(json.loads(msg),id)
+            async for raw_msg in websocket: 
+                msg_type = await self.interpret_msg_type(json.loads(raw_msg),id)
                 if msg_type == 'INFO':
                     pass
                 elif msg_type == 'SUCCESS':
-                    args = self.get_all_info() 
+                    args = await self.get_all_info() 
                     await self.ws_subscribe(args)
                 elif msg_type == 'ERROR':
                     raise Exception(c[2] + "\nERROR CONNECTING TO BITMEX WEBSOCKET" + c[0])
                     return
+         
 
-
-    def get_all_info(self):
+    async def get_all_info(self):
         """Returns websocket args to subscribe to position, margin, order, wallet, and trade."""
         trade = "trade:" + self.symbol
-        args = ["position","margin","wallet","order",trade,"execution"]
+        args = ["position","margin","wallet","order",str(trade), "execution"]
         return args 
        
 
@@ -141,8 +145,16 @@ class BitMEX:
         payload = {"op": "subscribe", "args": args}
         id = "bitMEX_stream"
         await self._ws.send(json.dumps(payload))
-        async for msg in self._ws:
-            await self.interpret_msg_type(json.loads(msg),id)
+        async for raw_msg in self._ws:
+            msg_type = await self.interpret_msg_type(json.loads(raw_msg),id)
+            if msg_type == 'INFO':
+                pass
+            elif msg_type == 'SUCCESS':
+                pass
+            elif msg_type == 'ERROR':
+                raise Exception(c[2] + "\nERROR SUBSCRIBING TO BITMEX WEBSOCKET" + c[0])
+            elif msg_type == 'TABLE':
+                await self.store_table_info(json.loads(raw_msg))
             
     
     async def interpret_msg_type(self, response, id):
@@ -154,53 +166,41 @@ class BitMEX:
             if 'subscribe' in response:
                 print(c[1] + f"\nBitMEX websocket successfully subscribed to {response['subscribe']}" + c[0])
                 return 'SUCCESS'
+            return 'SUCCESS'
         elif 'error' in response:
-            print(c[2] + f"\nBitmex Error response - \n{response}" + c[0])
-            raise Exception(c[2] + "\nERROR SUBSCRIBING TO BITMEX WEBSOCKET" + c[0])
+            print(c[2] + f"\n{response}" + c[0])
             return 'ERROR'
         elif 'table' in response:
-            await self.store_table_info(response)
             return 'TABLE'
         
 
     async def store_table_info(self, data):
-        """Stores bitmex table data on Position, Wallet, Margin, Order, and Trade."""
+        """Stores bitmex table data on Position, Wallet, Margin, Order, execution, and Trade."""
+        #print('storing-', data)
         if(data['table'] == 'position'):
             if(data['data']):
-                if data['data'][0]['isOpen']:
-                    self.position_data.closed = data['data'][0]
-                else:
-                    self.position_data.open = data['data'][0] 
+                self.position_data.append(data['data'][0])
 
         elif(data['table'] == 'wallet'):
-            print('wallet', data['data'])
-            #self.wallet_data = data['data'][0]
+            self.wallet_data = data['data'][0]
 
         elif(data['table'] == 'margin'):
-            print('margin', data)
             if(data['data']):
-                print('margin', data['data'])
-                #self.margin_data = data['data']
+                self.margin_data.append(data['data'][0])
 
         elif(data['table'] == 'order'):
-            print('order', data)
             if(data['data']):
-                print('order', data['data'])
-                #self.order_data.append(data['data'][0])
+                self.order_data.append(data['data'][0])
 
         elif(data['table'] == 'trade'):
-            print('trade', data)
             if(data['data']):
-                print('trade', data['data'])
-                #self.trade_data.append(data['data'][0])
+                self.trade_data.append(data['data'][0])
 
         elif(data['table'] == 'execution'):
-            print('exe', data)
             if(data['data']):
-                print('execution', data['data'])
-                #self.execution_data.append(data['data'][0])
-
-
+                self.execution_data.append(data['data'][0])
+   
+    
     # REST API 
     async def place_order(self, order):
         '''
