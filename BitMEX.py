@@ -452,7 +452,7 @@ class BitMEX:
                 self.cancel_all_orders(text="RateLimited Cancel")
 
                 logging.error("Your ratelimit will reset at %s. Sleeping for %d seconds." % (reset_str, to_sleep))
-                asyncio.sleep(to_sleep)
+                await asyncio.sleep(to_sleep)
 
                 # Retry the request.
                 return await retry()
