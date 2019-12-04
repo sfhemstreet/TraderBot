@@ -78,7 +78,7 @@ class TokenAnalyst:
     def check_for_inflow(self, data, threshold=None, exchange='Bitmex'):
         """
         Checks Token Analyst data for Inflow.
-        Returns -1 or the inflow value.
+        Returns 0 or the inflow value.
         Supply 'threshold' value to filter results to those above threshold.
         Supply 'exchange' value to filter by exchange, default is Bitmex. 
         (Valid exchange values are All, Binance, Bitmex, Bitfinex, Bittrex, Kraken, Poloniex, and Huobi)
