@@ -8,6 +8,7 @@ logging.basicConfig(filename="test.log", level=logging.DEBUG)
 from BitMEX import BitMEX
 from TokenAnalyst import TokenAnalyst
 from Trade import Trade
+from RateLimitTracker import RateLimitTracker
 from config import *
 from check_config import check_config
 from colors import c
@@ -36,24 +37,19 @@ def main():
         #   or open a short position if we do not
         #---------------------------------------
 
+        print(data)
+
         # set a threshold to watch for
-        inflow_threshold = 100
+        inflow_threshold = 0.0000001
 
         # check if data is an inflow
         # here we will supply a threshold to filter results to only those above our inflow_threshold 
-        result = token_analyst.check_for_inflow(data=data, threshold=inflow_threshold)
+        result = token_analyst.check_for_inflow(data=data, threshold=inflow_threshold, exchange='All')
 
         if result:
-            # check if you are going to above the ratelimit before doing any trades!
-            curr_time = int(time.time())
-            secs_between_trades = curr_time - ratelimit_tracker['time'] 
-
-            if(secs_between_trades > 60):
-                ratelimit_tracker['time'] = curr_time
-                ratelimit_tracker['count'] = 0
-            elif(ratelimit_tracker['count'] >= RATELIMIT_MAX):
-                print(c[3] + "\nRate Limit Hit, sleeping\n" + c[0])
-                await asyncio.sleep(60 - secs_between_trades)
+            # check if you are going to above the ratelimit before doing any trades
+            # check method must be awaited because we might async sleep
+            rate_limit.check(will_increment=False)
 
             # lets see if we have any positions open that we might want to sell
             position = bitmex.get_last_position()
@@ -74,8 +70,8 @@ def main():
                     # we get back the order details that we can use to ammend/cancel/track the order
                     order_details = await bitmex.place_order(sell_order)
 
-                    # keep track of rate limit!
-                    ratelimit_tracker['count'] += 1
+                    # keep track of rate limit
+                    rate_limit.increment()
                     return
                 
             last_price = bitmex.get_last_trade_price()
@@ -85,8 +81,8 @@ def main():
                 short_price = int(last_price - 100)
                 short_order = trade.limit_sell(quantity=10, price=short_price)
                 short_order_details = await bitmex.place_order(short_order)
-                # keep track of rate limit!
-                ratelimit_tracker['count'] += 1
+                # keep track of rate limit
+                rate_limit.increment()
 
         
 
@@ -110,12 +106,7 @@ def main():
     trade = Trade(symbol=G_DEFAULT_BITMEX_SYMBOL)
 
     # keep track of trades per minute to avoid rate limit
-    ratelimit_tracker = {
-        'time': int(time.time()),
-        'count': 0
-    }
-
-    RATELIMIT_MAX = 30 # is 60 if you are logged into Bitmex 
+    rate_limit = RateLimitTracker()
 
     # create asyncio event loop
     loop = asyncio.get_event_loop() 

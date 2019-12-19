@@ -4,12 +4,39 @@ import uuid
 from config import G_DEFAULT_BITMEX_SYMBOL # if you dont have this declared in config go do that
 from Exceptions import InvalidArgError
 
-'''
-    TRADE
-    each returns an order that can be used in a single or bulk order (ie bitmex.place_order(my_order) or bitmex.bulk_order([order1, order2])).
-    add your own trade functions here or use self.make_order 
-'''
 class Trade:
+    '''
+    class for making orders for Bitmex API.
+
+    Attributes:
+
+    `symbol: str`
+        symbol for trades
+
+    `orderIdPrefex: str`
+        prefex for order IDs
+
+    Methods:
+
+    `market_buy`
+
+    `market_sell`
+
+    `limit_buy`
+
+    `limit_sell`
+
+    `stop_order`
+
+    `close`
+
+    `make_order`
+
+    each method returns an order that can be used in a single or bulk order 
+    
+    (ie bitmex.place_order(my_order) or bitmex.bulk_order([order1, order2]))
+
+    '''
     def __init__(self, symbol, orderIDPrefex="traderbot_"):
         self.symbol = symbol
         self.orderIDPrefex = orderIDPrefex
@@ -18,6 +45,16 @@ class Trade:
     def market_buy(self,quantity):
         '''
         returns an order to Buy at market price. 
+
+        Parameters:
+
+        `quantity: int`
+            number of contracts
+
+        Returns:
+
+        `order: dict`
+            market buy order
         '''
         side="Buy"
         order = self.make_order(
@@ -29,7 +66,17 @@ class Trade:
 
     def market_sell(self,quantity):
         '''
-        Returns a order for Selling at market price.
+        Make a order for Selling at market price.
+
+        Parameters:
+
+        `quantity: int`
+            number of contracts
+
+        Returns:
+
+        `order: dict`
+            market sell order
         '''
         side="Sell"
         order = self.make_order(
@@ -40,7 +87,22 @@ class Trade:
 
 
     def limit_buy(self,quantity, price):
-        '''Returns a limit buy order.'''
+        '''Make a limit buy order.
+        
+        Parameters:
+
+        `quantity: int`
+            number of contracts
+
+        `price: float`
+            price, must be val;id tickSize, ie must be integer or .5 between int 
+
+        Returns:
+
+        `order: dict`
+            limit buy order
+        
+        '''
         self.is_tickSize_valid(price)
 
         side = "Buy"
@@ -53,7 +115,22 @@ class Trade:
         
 
     def limit_sell(self,quantity, price):
-        """Returns a limit sell / short order."""
+        """Make a limit sell / short order.
+        
+        Parameters:
+
+        `quantity: int`
+            number of contracts
+
+        `price: float`
+            price, must be val;id tickSize, ie must be integer or .5 between int
+
+        Returns:
+
+        `order: dict`
+            limit sell order
+        
+        """
 
         self.is_tickSize_valid(price)
 
@@ -67,9 +144,30 @@ class Trade:
 
 
     def stop_order(self,quantity, stopPx, price=None, execInst=None):
-        '''Returns a stop order.
+        '''
+        Creates a stop order.
+
         Use a price below the current price for stop-sell orders and buy-if-touched orders. 
+
         Use execInst of 'MarkPrice' or 'LastPrice' to define the current price used for triggering.
+
+        Parameters:
+
+        `quantity: int`
+            number of contracts
+
+        `stopPx: float`
+            stop price
+
+        `price: float`
+            price
+
+        `execInst:str`
+
+        Returns:
+        
+        `order: dict`
+            stop order 
         '''
         if price:
             self.is_tickSize_valid(price)
@@ -86,8 +184,31 @@ class Trade:
     def close(self,quantity=None, side=None, symbol=None, orderIDPrefix=None):
         '''
         Returns a close order ready to send to Bitmex.
+
         cancel other active limit orders with the same side and symbol if the open quantity exceeds the current position.
+
         Side or quantity required.
+        --------------------------
+
+        Parameters:
+
+        `quantity: int`
+            number of contracts to close
+
+        `side: str`
+            Buy or Sell
+
+        `symbol: str`
+            symbol to apply close to
+
+        `orderIDPrefix: str`
+            label prefix of close, if none supplied uses default
+
+        Returns:
+
+        `order: dict`
+            close order
+        
         '''
         if symbol == None:
             symbol = self.symbol
@@ -126,13 +247,52 @@ class Trade:
         orderIDPrefix=None):
         """
             Make your own order.
-            Returns an order object ready to use in bulk or single order. 
-            Must supply quantity. 
-            If no price supplied, order is market sell or buy.
-            side is either 'Buy' or 'Sell'
-            displayQty of 0 hides order
-            stopPx, optional trigger price, use a price below the current price for stop-sell orders and buy-if-touched orders.
-            For more info see Bitmex API explorer.
+
+            Parameters:
+
+            `quantity: int`
+                number of contracts, each contract is worth 1 USD of Bitcoin. 
+             
+            `symbol: str`
+                symbol of trade
+
+            `price: float`
+                price of trade, must be approprate ticksize, either an integer or .5
+                If no price supplied, order is market sell or buy.
+
+            `side: str`
+                buy or sell
+
+            `orderType: str`
+                type of order (Market, Limit, Stop, StopLimit, MarketIfTouched, LimitIfTouched, or Pegged)
+
+            `displayQty: int`
+                what quantity yopu want order to display, 0 hides order
+
+            `stopPx: float`
+                optional trigger price, use a price below the current price for stop-sell orders and buy-if-touched orders.
+            
+            `pegOffsetValue: float`
+                value of pegOffset
+
+            `pegPriceType:str`
+                pegOffset type (LastPeg, MidPricePeg, MarketPeg, PrimaryPeg, or TrailingStopPeg)
+
+            `timeInForce: str`
+                (Day, GoodTillCancel, ImmediateOrCancel, or FillOrKill) 
+
+            `execInst: str`
+                (ParticipateDoNotInitiate, AllOrNone, MarkPrice, IndexPrice, LastPrice, Close, ReduceOnly, or Fixed)
+
+            `orderIDPrefix:str`
+                labels order id with prefix
+            
+            For more info on orders see Bitmex API explorer.
+
+            Returns:
+            
+            `order: dict`
+                an order ready to be sent in a bulk or single order.
         """
         # Read Me - This creates all the orders below, so dont break it
 
@@ -222,6 +382,7 @@ class Trade:
 
     def is_tickSize_valid(self,price):
         """Check for valid tickSize, ie if the price is an integer or .5 away."""
+
         if not isinstance(price, int):
             if not isinstance(price + 0.5, int):
                 raise InvalidArgError(price,"Invalid Tick Size! Prices must be set at integer or .5 between")

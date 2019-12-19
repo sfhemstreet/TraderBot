@@ -24,6 +24,96 @@ c = (
 )
 
 class BitMEX:
+    """
+    Class for interactions with Bitmex.
+    
+    Connect to Bitmex websocket for position, margin, order, wallet, and trade data.
+
+    Place, amend, and cancel orders on Bitmex exchange.
+
+    Attributes:
+
+    `key: str`
+        Bitmex API key
+    
+    `secret: str`
+        Bitmex API secret 
+    
+    `symbol: str`
+        trade symbol
+    
+    `base_url: str` 
+        base url for Bitmex REST API
+    
+    `ws_url: str`
+        Bitmex websocket url
+    
+    `orderIDPrefex: str`
+        prefex attached to order IDs
+    
+    `timeout: int`
+        timeout time, default is 8
+
+    Methods:
+
+    `connect`
+        connect to Bitmex websocket, subscribes to get position, margin, order, wallet, and trade data.
+
+    `place_order`
+        place an order on the Bitmex exchange
+
+    `place_bulk_order`
+        place a bulk order on the Bitmex exchange
+
+    `cancel_order`
+        cancel order
+
+    `cancel_all_orders`
+        cancels all orders, or of filtered orders
+
+    `amend_order`
+        amend an order 
+
+    `amend_bulk_order`
+        amend bulk order
+
+    `update_leverage`
+        update your leverage
+
+    `isolated_margin`
+        Enable isolated margin per-position.
+
+    `cross_margin`
+        Enable cross margin per-position.
+
+    `transfer_margin`
+        Transfer equity in or out of a position. 
+
+    `risk_limit`
+        Update your risk limit. 
+
+    `get_positions`
+        get your position data
+
+    `get_last_position`
+        get last position data
+
+    `get_wallet_amount`
+        get amount in wallet
+
+    `get_last_margin_data`
+        get last margin data
+
+    `get_last_order_data`
+        get last order data
+
+    `get_last_trade_data`
+        get last trade data
+
+    `get_last_trade_price`
+        get last trade price
+
+    """
     def __init__(self, key, secret, symbol, base_url, ws_url, orderIDPrefex="traderbot_", timeout=8):
         self.name = "Bitmex"
         self._key = key
@@ -50,19 +140,6 @@ class BitMEX:
         self.order_data = deque(maxlen=100)
         self.trade_data = deque(maxlen=100)
         self.execution_data = deque(maxlen=100)
-
-
-    def calc_inflow_average(self, new_value):
-        """Calculates running average from token analys inflow 
-        data and prints the running average for every x inflows."""
-        # set x to how many data points you want to average before it is printed
-        x = 20
-        self._inflow_count = self._inflow_count + 1
-        self._inflow_total = self._inflow_total + new_value
-        self._inflow_average = self._inflow_total / self._inflow_count
-        
-        if(self._inflow_count % x == 0):
-            print(c[1] + f"\nCurrent inflow average is {round(self._inflow_average,4)}" + c[0])
 
 
     # getters for Bitmex Data stored from websocket stream
@@ -105,49 +182,424 @@ class BitMEX:
             return self.trade_data[-1]['price']
         return None
 
+
+    # REST API 
+    async def place_order(self, order):
+        '''
+            Place an order on the bitmex exchange.
+
+            async func - use await
+
+            Parameters:
+            
+            `order: dict`
+                order ( use Trade class to make orders )
+
+            Returns:
+            
+            `orderInfo: json data`
+                bitmex response
+        '''
+        endpoint = "order"
+        return await self._http_request(path=endpoint, postdict=order, verb="POST")
+
+
+    async def place_bulk_order(self, orders):
+        """Place a bulk order on Bitmex exchange.
+
+        async func - use await
+        
+        Parameters:
+
+        `orders: array<dict>`
+            array of orders ( use Trade class to make orders )
+
+        Returns:
+            
+        `orderInfo: json data`
+            bitmex response
+
+        """
+        if len(orders) < 1:
+            raise InvalidArgError(orders, "Orders must be more than 1 order.")
+
+        endpoint = "order/bulk"
+        allOrders = {'orders': orders}
+        return await self._http_request(path=endpoint, postdict=allOrders, verb="POST")
+        
+
+    async def cancel_order(self, orderID=None, clOrdID=None, text=None):
+        """Cancel an existing order(s) by submitting orderID(s) or clOrdID(s). 
+        
+        Supply optional text to annotate cancellation.
+
+        async func - use await
+        
+        Parameters:
+
+        `orderID: str`
+            orderID of order to cancel
+
+        `clOrdID: str`
+            clOrdID of order to cancel
+
+        `text: str`
+            annnotaion text
+
+        Returns:
+
+        `orderInfo: json data`
+            bitmex response
+        """
+        if orderID == None and clOrdID == None:
+            raise InvalidArgError([orderID, clOrdID], "Must submit either orderID or clOrdID to cancel order(s).")
+
+        path = "order"
+        postdict = {}
+        if orderID:   postdict['orderID'] = orderID
+        elif clOrdID: postdict['clOrdID'] = clOrdID
+        if text:      postdict['text'] = text
+
+        return await self._http_request(path=path, postdict=postdict, verb="DELETE")
+
+
+    async def cancel_all_orders(self, symbol=None, cancel_filter=None, text=None):
+        """
+        Cancel all orders. 
+
+        async func - use await
+
+        Parameters:
+
+        `symbol: str` 
+            optional, if supplied only cancels order of that symbol.
+
+        `cancel_filter: str`
+             optional, optional filter for cancellation, use to only cancel some orders, e.g. {"side": "Buy"}
+
+        `text`
+            supply optional text to annotate cancellation.
+
+        Returns:
+
+        `orderInfo: json data`
+            bitmex response
+
+        """
+        path = "order/all"
+        postdict = {}
+        if symbol:          postdict['symbol'] = symbol
+        if cancel_filter:   postdict['filter'] = cancel_filter
+        if text:            postdict['text']   = text
+
+        if postdict: 
+            return await self._http_request(path=path, postdict=postdict, verb="DELETE")
+        else: 
+            return await self._http_request(path=path, verb="DELETE")
+
+
+
+    async def amend_order(self, orderID=None, origClOrdID=None, clOrdID=None, orderQty=None, leavesQty=None, price=None, stopPx=None, pegOffsetValue=None, text=None):
+        """
+        Amend the quantity or price of an open order.
+
+        Send an orderID or origClOrdID to identify the order you wish to amend.
+
+        Both order quantity and price can be amended. Only one qty field can be used to amend.
+
+        Use the leavesQty field to specify how much of the order you wish to remain open. 
+        This can be useful if you want to adjust your position's delta by a certain amount, regardless of how much of the order has already filled.
+        A leavesQty can be used to make a "Filled" order live again, if it is received within 60 seconds of the fill.
+
+        async func - use await
+
+        Parameters:
+
+        `orderID: str`
+            order ID
+
+        `origClOrdID: str`
+            the orginal clOrdID
+
+        `clOrdID: str`
+            clOrdID for amend
+
+        `orderQty: int`
+            order quantity
+
+        `leavesQty: int`
+            how much of the order you wish to remain open
+        
+        `price: float`
+            price to amend to, use valid tickSize, ie integer or .5
+
+        `stopPx: float`
+            stop to amend
+
+        `pegOffsetValue: float`
+            pegOffset Value
+
+        `text: str`
+            annotate amend for records
+
+        Returns:
+
+        `orderInfo: json data`
+            bitmex response
+
+        """
+        if orderID == None and origClOrdID == None:
+            raise InvalidArgError([orderID, origClOrdID], "Must submit either orderID or origClOrdID to amend order(s).")
+        
+        path = "order"
+        postdict = {}
+
+        if orderID:         postdict['orderID']         = orderID
+        if origClOrdID:     postdict['origClOrdID']     = origClOrdID
+        if clOrdID:         postdict['clOrdID']         = clOrdID
+        if orderQty:        postdict['orderQty']        = orderQty
+        if leavesQty:       postdict['leavesQty']       = leavesQty
+        if price:           postdict['price']           = price
+        if stopPx:          postdict['stopPx']          = stopPx
+        if pegOffsetValue:  postdict['pegOffsetValue']  = pegOffsetValue
+        if text:            postdict['text']            = text
+
+        return await self._http_request(path=path, postdict=postdict, verb='PUT')
+
+
+    async def amend_bulk_order(self, orders):
+        """Amend multiple orders for the same symbol. 
+
+        async func - use await
+        
+        Parameters:
+
+        `orders: array<dict>`
+            array of orders to amend
+
+        Returns:
+
+        `orderInfo: json data`
+            bitmex response
+        """
+
+        path = "order/bulk"
+        postdict = {
+            'orders': orders
+        }
+        return await self._http_request(path=path, postdict=postdict, verb='PUT')
+
+
+    async def update_leverage(self, leverage, symbol=None):
+        """
+        Choose leverage for a position. 
+
+        async func - use await
+
+        Parameters:
+
+        `leverage: float` 
+            a number between 0.01 and 100 to enable isolated margin with a fixed leverage. 
+            0 to enable cross margin.
+
+        `symbol: str` 
+            default symbol used if not supplied.
+
+        Returns:
+
+        `orderInfo: json data`
+            bitmex response
+        """
+        if symbol == None:
+            symbol = self.symbol
+
+        path = "position/leverage"
+        postdict = {
+            'symbol': symbol,
+            'leverage': leverage
+        }
+        return await self._http_request(path=path, postdict=postdict, verb='POST')
+
+
+    async def isolated_margin(self, symbol=None):
+        """Enable isolated margin per-position. 
+
+        async func - use await
+        
+        Parameters:
+
+        `symbol: str`
+            symbol, if not supplied, uses default.
+
+        Returns:
+        
+        `orderInfo: json data`
+            bitmex response
+        
+        """
+        if symbol == None:
+            symbol = self.symbol
+
+        path = "position/isolate"
+        postdict = {
+            'symbol': symbol,
+            'enabled': True
+        }
+        return await self._http_request(path=path, postdict=postdict, verb='POST')
+
+
+    async def cross_margin(self, symbol=None):
+        """Enable cross margin per-position. 
+
+        async func - use await
+        
+        Parameters:
+
+        `symbol: str`
+            symbol, if not supplied, uses default.
+
+        Returns:
+        
+        `orderInfo: json data`
+            bitmex response
+        
+        """
+
+        if symbol == None:
+            symbol = self.symbol
+
+        path = "position/isolate"
+        postdict = {
+            'symbol': symbol,
+            'enabled': False
+        }
+        return await self._http_request(path=path, postdict=postdict, verb='POST')
+
+
+    async def transfer_margin(self, amount, symbol=None):
+        """
+        Transfer equity in or out of a position. 
+
+        async func - use await
+
+        Parameters:
+
+        `amount: float` 
+            Amount to transfer, in Satoshis, May be negative.
+
+        `symbol: str`  
+            Symbol of position to isolate, if no symbol supplied, uses default.
+
+        Returns:
+        
+        `orderInfo: json data`
+            bitmex response
+        
+        """
+        if symbol == None:
+            symbol = self.symbol
+        
+        path = "position/transferMargin"
+        postdict = {
+            'symbol': symbol,
+            'amount': amount
+        }
+        return await self._http_request(path=path, postdict=postdict, verb='POST')
+
+
+    async def risk_limit(self, riskLimit, symbol=None):
+        """
+        Update your risk limit. 
+
+        async func - use await
+
+        Parameters:
+
+        `riskLimit: float` 
+            New Risk Limit, in Satoshis
+
+        `symbol: str`
+            symbol, if not supplied, uses default.
+
+        Returns:
+        
+        `orderInfo: json data`
+            bitmex response
+        
+        """
+        if symbol == None:
+            symbol = self.symbol
+
+        path = "position/riskLimit"
+        postdict = {
+            'symbol': symbol,
+            'riskLimit': riskLimit
+        }
+        return await self._http_request(path=path, postdict=postdict, verb='POST')
+
     
     # WEBSOCKETS
     # Following code is for websocket connection - 
     async def connect(self):
-        """Connects to Bitmex websocket."""
+        """Connects to Bitmex websocket. async func - use await"""
        
         WS_VERB = "GET"
         WS_ENDPOINT = "/realtime"
         EXPIRES = int(round(time.time()) + 100)
         uri = str(self._ws_url + WS_ENDPOINT)
+        # we need to generate a signiture to connect, see bitmex docs for more info on this
         signature = bitmex_helpers.generate_signature(self._secret, WS_VERB, WS_ENDPOINT, EXPIRES)
         id = "bitMEX_stream"
-        payload = {"op": "authKeyExpires", "args": [self._key, EXPIRES, signature]}
 
+        payload = {
+            "op": "authKeyExpires",
+            "args": [
+                self._key, 
+                EXPIRES, 
+                signature
+            ]
+        }
+
+        # connect to websocket with no timeout time
         async with websockets.connect(uri, ping_timeout=None) as websocket:
             self._ws = websocket
             await websocket.send(json.dumps(payload))
+
+            # check data in the init response from websocket
             async for raw_msg in websocket: 
-                msg_type = await self.interpret_msg_type(json.loads(raw_msg),id)
+                msg_type = await self._interpret_msg_type(json.loads(raw_msg),id)
                 if msg_type == 'INFO':
                     pass
                 elif msg_type == 'SUCCESS':
-                    args = await self.get_all_info() 
-                    await self.ws_subscribe(args)
+                    # we are connected, subscribe to channels we want
+                    args = await self._get_all_info() 
+                    await self._ws_subscribe(args)
                 elif msg_type == 'ERROR':
                     raise WebSocketError(json.loads(raw_msg),"ERROR CONNECTING TO BITMEX WEBSOCKET")
                     return
          
 
-    async def get_all_info(self):
+    async def _get_all_info(self):
         """Returns websocket args to subscribe to position, margin, order, wallet, and trade."""
         trade = "trade:" + self.symbol
         args = ["position","margin","wallet","order",str(trade), "execution"]
         return args 
        
 
-    async def ws_subscribe(self, args):
+    async def _ws_subscribe(self, args):
         """Subscribes to data on bitmex websocket. Takes in array of args for what to subscribe to."""
-        payload = {"op": "subscribe", "args": args}
+        
         id = "bitMEX_stream"
+        payload = {
+            "op": "subscribe",
+            "args": args
+        }
+
+        # send our subscribe args 
         await self._ws.send(json.dumps(payload))
+        # look at responses back, and store table data 
         async for raw_msg in self._ws:
-            msg_type = await self.interpret_msg_type(json.loads(raw_msg),id)
+            msg_type = await self._interpret_msg_type(json.loads(raw_msg),id)
             if msg_type == 'INFO':
                 pass
             elif msg_type == 'SUCCESS':
@@ -155,10 +607,10 @@ class BitMEX:
             elif msg_type == 'ERROR':
                 raise WebSocketError(json.loads(raw_msg),"ERROR SUBSCRIBING TO BITMEX WEBSOCKET")
             elif msg_type == 'TABLE':
-                await self.store_table_info(json.loads(raw_msg))
+                await self._store_table_info(json.loads(raw_msg))
             
     
-    async def interpret_msg_type(self, response, id):
+    async def _interpret_msg_type(self, response, id):
         """Gets response from websocket and returns type of response, ie table, info, success, error."""
         if 'info' in response:
             print(c[1] + f"\n{response['info']} Limit : {response['limit']}" + c[0]) 
@@ -175,7 +627,7 @@ class BitMEX:
             return 'TABLE'
         
 
-    async def store_table_info(self, data):
+    async def _store_table_info(self, data):
         """Stores bitmex table data on Position, Wallet, Margin, Order, execution, and Trade."""
         #print('storing-', data)
         if(data['table'] == 'position'):
@@ -201,176 +653,6 @@ class BitMEX:
             if(data['data']):
                 self.execution_data.append(data['data'][0])
    
-    
-    # REST API 
-    async def place_order(self, order):
-        '''
-            Send single order. 
-            return order ID
-        '''
-        endpoint = "order"
-        return await self._http_request(path=endpoint, postdict=order, verb="POST")
-
-
-    async def place_bulk_order(self, orders):
-        """Place a bulk order via REST API."""
-        if len(orders) < 1:
-            raise InvalidArgError(orders, "Orders must be more than 1 order.")
-
-        endpoint = "order/bulk"
-        allOrders = {'orders': orders}
-        return await self._http_request(path=endpoint, postdict=allOrders, verb="POST")
-        
-
-    async def cancel_order(self, orderID=None, clOrdID=None, text=None):
-        """Cancel an existing order(s) by submitting orderID(s) or clOrdID(s) (as a string). Supply optional text to annotate cancellation."""
-        if orderID == None and clOrdID == None:
-            raise InvalidArgError([orderID, clOrdID], "Must submit either orderID or clOrdID to cancel order(s).")
-
-        path = "order"
-        postdict = {}
-        if orderID:   postdict['orderID'] = orderID
-        elif clOrdID: postdict['clOrdID'] = clOrdID
-        if text:      postdict['text'] = text
-
-        return await self._http_request(path=path, postdict=postdict, verb="DELETE")
-
-
-    async def cancel_all_orders(self, symbol=None, cancel_filter=None, text=None):
-        """
-        Cancel all orders. 
-        symbol - optional, if supplied only cancels order of that symbol.
-        cancel_filter - optional, optional filter for cancellation, use to only cancel some orders, e.g. {"side": "Buy"}
-        text - supply optional text to annotate cancellation.
-        """
-        path = "order/all"
-        postdict = {}
-        if symbol:          postdict['symbol'] = symbol
-        if cancel_filter:   postdict['filter'] = cancel_filter
-        if text:            postdict['text']   = text
-
-        if postdict: 
-            return await self._http_request(path=path, postdict=postdict, verb="DELETE")
-        else: 
-            return await self._http_request(path=path, verb="DELETE")
-
-
-
-    async def amend_order(self, orderID=None, origClOrdID=None, clOrdID=None, orderQty=None, leavesQty=None, price=None, stopPx=None, pegOffsetValue=None, text=None):
-        """
-        Amend the quantity or price of an open order.
-        Send an orderID or origClOrdID to identify the order you wish to amend.
-        Both order quantity and price can be amended. Only one qty field can be used to amend.
-        Use the leavesQty field to specify how much of the order you wish to remain open. 
-        This can be useful if you want to adjust your position's delta by a certain amount, regardless of how much of the order has already filled.
-        A leavesQty can be used to make a "Filled" order live again, if it is received within 60 seconds of the fill.
-        """
-        if orderID == None and origClOrdID == None:
-            raise InvalidArgError([orderID, origClOrdID], "Must submit either orderID or origClOrdID to amend order(s).")
-        
-        path = "order"
-        postdict = {}
-
-        if orderID:         postdict['orderID']         = orderID
-        if origClOrdID:     postdict['origClOrdID']     = origClOrdID
-        if clOrdID:         postdict['clOrdID']         = clOrdID
-        if orderQty:        postdict['orderQty']        = orderQty
-        if leavesQty:       postdict['leavesQty']       = leavesQty
-        if price:           postdict['price']           = price
-        if stopPx:          postdict['stopPx']          = stopPx
-        if pegOffsetValue:  postdict['pegOffsetValue']  = pegOffsetValue
-        if text:            postdict['text']            = text
-
-        return await self._http_request(path=path, postdict=postdict, verb='PUT')
-
-
-    async def amend_bulk_order(self, orders):
-        """Amend multiple orders for the same symbol, supply array of orders."""
-        path = "order/bulk"
-        postdict = {
-            'orders': orders
-        }
-        return await self._http_request(path=path, postdict=postdict, verb='PUT')
-
-
-    async def update_leverage(self, leverage, symbol=None):
-        """
-        Choose leverage for a position. 
-        Leverage value - Send a number between 0.01 and 100 to enable isolated margin with a fixed leverage. 
-        Send 0 to enable cross margin.
-        Default symbol used if not supplied.
-        """
-        if symbol == None:
-            symbol = self.symbol
-
-        path = "position/leverage"
-        postdict = {
-            'symbol': symbol,
-            'leverage': leverage
-        }
-        return await self._http_request(path=path, postdict=postdict, verb='POST')
-
-
-    async def isolated_margin(self, symbol=None):
-        """Enable isolated margin per-position. If no symbol supplied, uses default."""
-        if symbol == None:
-            symbol = self.symbol
-
-        path = "position/isolate"
-        postdict = {
-            'symbol': symbol,
-            'enabled': True
-        }
-        return await self._http_request(path=path, postdict=postdict, verb='POST')
-
-
-    async def cross_margin(self, symbol=None):
-        """Enable cross margin per-position. If no symbol supplied, uses default."""
-        if symbol == None:
-            symbol = self.symbol
-
-        path = "position/isolate"
-        postdict = {
-            'symbol': symbol,
-            'enabled': False
-        }
-        return await self._http_request(path=path, postdict=postdict, verb='POST')
-
-
-    async def transfer_margin(self, amount, symbol=None):
-        """
-        Transfer equity in or out of a position. 
-        amount - Amount to transfer, in Satoshis, May be negative.
-        symbol - Symbol of position to isolate, if no symbol supplied, uses default.
-        """
-        if symbol == None:
-            symbol = self.symbol
-        
-        path = "position/transferMargin"
-        postdict = {
-            'symbol': symbol,
-            'amount': amount
-        }
-        return await self._http_request(path=path, postdict=postdict, verb='POST')
-
-
-    async def risk_limit(self, riskLimit, symbol=None):
-        """
-        Update your risk limit. 
-        riskLimit - New Risk Limit, in Satoshis (double).
-        If no symbol supplied, uses default.
-        """
-        if symbol == None:
-            symbol = self.symbol
-
-        path = "position/riskLimit"
-        postdict = {
-            'symbol': symbol,
-            'riskLimit': riskLimit
-        }
-        return await self._http_request(path=path, postdict=postdict, verb='POST')
-
-
 
     async def _http_request(self, path, query=None, postdict=None, timeout=None, verb=None, rethrow_errors=False, max_retries=None):
         """Send a request to BitMEX Servers. Returns json response."""
@@ -513,97 +795,3 @@ class BitMEX:
 
         return response.json()
 
-
-    ''' REST API requests. Not needed with use of websockets 
-     async def get_orders_rest(self):
-        """Get open orders via REST API http."""
-        path = "order"
-        orders = await self._http_request(
-            path=path,
-            query={
-                'filter': json.dumps({'ordStatus.isTerminated': False, 'symbol': self.symbol}),
-                'count': 500
-            },
-            verb="GET"
-        )
-        # Only return orders that start with our clOrdID prefix.
-        return [o for o in orders if str(o['clOrdID']).startswith(self._orderIDPrefix)]
-
-
-    async def get_orders(self):
-        """Get orders via websocket."""
-        arg = ["order"]
-        self.ws_subscribe(arg)
-
-    
-    async def get_positions_rest(self):
-        """Get current positions via REST API http."""
-        path = "position"
-        columns = ['lastPrice']
-        positions = await self._http_request(
-            path=path,
-            verb="GET",
-            query={
-                'columns': ['unrealisedRoePcnt','timestamp',
-                            'currentTimestamp','breakEvenPrice',
-                            'markPrice','markValue','currentQty',
-                            'avgEntryPrice','isOpen']
-            }
-        )
-        return positions
-
-
-
-    async def get_positions(self):
-        """Get current positions via Websocket."""
-        arg = ["position"]
-        self.ws_subscribe(arg)
-
-
-
-    async def get_stats_rest(self):
-        "Get exchange statistics via REST API http."
-        path = "stats"
-        stats = await self._http_request(
-            path=path,
-            verb="GET"
-        )
-        return stats
-
-
-    async def get_quote_rest(self):
-        """Get best bid/offer snapshot via REST API http."""
-        path = "quote"
-        quote = await self._http_request(
-            path=path,
-            verb="GET",
-            query={
-                'symbol': 'XBT:nearest',
-                'count': 1
-            }
-        )
-        return quote
-
-
-    async def get_quote(self):
-        """Get top level of the book via websocket."""
-        arg = ["quote"]
-        self.ws_subscribe(arg)
-
-
-    async def get_last_xbt_trade_rest(self):
-        "Get last trade price of XBT via REST API http."
-        path = "trade"
-        trade = await self._http_request(
-            path=path,
-            query={
-                'symbol':'XBT',
-                'count': 1,
-                'reverse': True
-            }
-        )
-        return trade[0]
-    '''
-
-    
-    
