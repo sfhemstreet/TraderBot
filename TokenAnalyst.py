@@ -4,15 +4,8 @@ import json
 import asyncio
 import sys
 from Exceptions import WebSocketError
+from colors import c
 
-
-# ANSI colors
-c = (
-    "\033[0m",   # End of color
-    "\033[36m",  # Cyan
-    "\033[91m",  # Red
-    "\033[35m",  # Magenta
-)
 
 class TokenAnalyst:
     """
@@ -168,7 +161,7 @@ class TokenAnalyst:
 
     async def connect(self, channel="btc_confirmed_exchange_flows"):
         """
-        Connects to Token Analyst websocket, and yields blockchain data.
+        Connects to Token Analyst websocket, and yields on-chain data.
 
         async func - use await
 
@@ -198,7 +191,7 @@ class TokenAnalyst:
             self._ws = websocket
             await websocket.send(json.dumps(payload))
             async for msg in websocket: 
-                # check msg for data, returns None or blockchain data
+                # check msg for data, returns None or on-chain data
                 data = await self._interpret(json.loads(msg), id)
                 yield data 
 
@@ -213,7 +206,7 @@ class TokenAnalyst:
 
 
     async def _interpret(self, response, id):
-        """check for heartbeat, connection success / errors, and Inflow."""
+        """check for heartbeat, connection success / errors, and Data."""
 
         if(response['id'] == id and response['event'] == "data"):
             return await self._on_data(response['data'])
@@ -227,7 +220,7 @@ class TokenAnalyst:
             
 
     async def _on_data(self, data): 
-        """Returns blockchain data."""
+        """Returns on-chain data."""
 
         return data
 
@@ -255,9 +248,6 @@ class TokenAnalyst:
         sys.exit(1)
 
 
-    
-
-
     def _inflow_outflow_check(self, data, check_flowtype, threshold, exchange):
         '''used for check_for_outflow_value() and check_for_inflow_value()'''
         
@@ -276,6 +266,3 @@ class TokenAnalyst:
 
         return value
 
-
-
-    

@@ -4,24 +4,16 @@ import asyncio
 import hashlib
 import hmac
 import time
-import urllib.parse
 import requests
 import datetime
 import base64
 import uuid
 import logging
-import bitmex_helpers
+import urllib
+from colors import c
 from collections import deque
 from Exceptions import WebSocketError, InvalidArgError
 
-
-# ANSI colors
-c = (
-    "\033[0m",   # End of color
-    "\033[36m",  # Cyan
-    "\033[91m",  # Red
-    "\033[35m",  # Magenta
-)
 
 class BitMEX:
     """
@@ -143,7 +135,7 @@ class BitMEX:
 
 
     # getters for Bitmex Data stored from websocket stream
-    def get_positions(self):
+    def get_position_data(self):
         """Returns all position data."""
         return self.position_data
 
@@ -155,25 +147,24 @@ class BitMEX:
         return None
 
 
-    def get_wallet_amount(self):
-        """Returns amount available in Bitmex wallet or None."""
-        if self.wallet_data:
-            return self.wallet_data['amount']
-        return None
+    def get_wallet_data(self):
+        """Returns all Bitmex wallet data."""
+        return self.wallet_data
 
 
-    def get_last_margin_data(self):
-        """Returns latest margin data or None."""
-        if self.margin_data:
-            return self.margin_data[-1]
-        return None
+    def get_margin_data(self):
+        """Returns margin data."""
+        return self.margin_data
 
 
-    def get_last_order_data(self):
-        """Returns latest order data or None."""
-        if self.order_data:
-            return self.order_data[-1]
-        return None
+    def get_order_data(self):
+        """Returns all order data."""
+        return self.order_data
+        
+
+    def get_trade_data(self):
+        """Returns all trade data."""
+        return self.trade_data
 
 
     def get_last_trade_price(self):
@@ -181,6 +172,11 @@ class BitMEX:
         if self.trade_data:
             return self.trade_data[-1]['price']
         return None
+
+    
+    def get_execution_data(self):
+        """Returns all execution data."""
+        return self.execution_data
 
 
     # REST API 
@@ -221,7 +217,7 @@ class BitMEX:
 
         """
         if len(orders) < 1:
-            raise InvalidArgError(orders, "Orders must be more than 1 order.")
+            raise InvalidArgError(orders, "Invalid bulk order number.")
 
         endpoint = "order/bulk"
         allOrders = {'orders': orders}
@@ -299,7 +295,18 @@ class BitMEX:
 
 
 
-    async def amend_order(self, orderID=None, origClOrdID=None, clOrdID=None, orderQty=None, leavesQty=None, price=None, stopPx=None, pegOffsetValue=None, text=None):
+    async def amend_order(
+        self, 
+        orderID=None, 
+        origClOrdID=None, 
+        clOrdID=None, 
+        orderQty=None, 
+        leavesQty=None, 
+        price=None, 
+        stopPx=None, 
+        pegOffsetValue=None, 
+        text=None
+    ):
         """
         Amend the quantity or price of an open order.
 
@@ -538,17 +545,20 @@ class BitMEX:
         return await self._http_request(path=path, postdict=postdict, verb='POST')
 
     
-    # WEBSOCKETS
-    # Following code is for websocket connection - 
+    # ------------------ WEBSOCKETS -------------------
     async def connect(self):
-        """Connects to Bitmex websocket. async func - use await"""
-       
+        """
+        Connect to Bitmex websocket to recieve and store position, margin, order, wallet, and trade data. 
+        
+        async func - use await
+        """
+
         WS_VERB = "GET"
         WS_ENDPOINT = "/realtime"
         EXPIRES = int(round(time.time()) + 100)
         uri = str(self._ws_url + WS_ENDPOINT)
         # we need to generate a signiture to connect, see bitmex docs for more info on this
-        signature = bitmex_helpers.generate_signature(self._secret, WS_VERB, WS_ENDPOINT, EXPIRES)
+        signature = generate_signature(self._secret, WS_VERB, WS_ENDPOINT, EXPIRES)
         id = "bitMEX_stream"
 
         payload = {
@@ -582,7 +592,17 @@ class BitMEX:
     async def _get_all_info(self):
         """Returns websocket args to subscribe to position, margin, order, wallet, and trade."""
         trade = "trade:" + self.symbol
-        args = ["position","margin","wallet","order",str(trade), "execution"]
+
+        # to filter results 
+
+        args = [
+            "position",
+            "margin",
+            "wallet",
+            "order",
+            str(trade),
+            "execution"]
+
         return args 
        
 
@@ -629,7 +649,7 @@ class BitMEX:
 
     async def _store_table_info(self, data):
         """Stores bitmex table data on Position, Wallet, Margin, Order, execution, and Trade."""
-        #print('storing-', data)
+        
         if(data['table'] == 'position'):
             if(data['data']):
                 self.position_data.append(data['data'][0])
@@ -671,7 +691,7 @@ class BitMEX:
             max_retries = 0 if verb in ['POST', 'PUT'] else 3
 
         # Create auth header for request
-        auth = bitmex_helpers.BitmexHeaders(self._key, self._secret)
+        auth = BitmexHeaders(self._key, self._secret)
 
         def exit_or_throw(e):
             if rethrow_errors:
@@ -795,3 +815,44 @@ class BitMEX:
 
         return response.json()
 
+
+"""Taken from BitMEX market maker."""
+# Generates an API signature.
+# A signature is HMAC_SHA256(secret, verb + path + expires + data), hex encoded.
+# Verb must be uppercased, url is relative, expires must be an increasing 64-bit integer
+# and the data, if present, must be JSON without whitespace between keys.
+def generate_signature(secret, verb, url, nonce, data=''):
+    """Generate a request signature compatible with BitMEX."""
+    # Parse the url so we can remove the base and extract just the path.
+    parsedURL = urllib.parse.urlparse(url)
+    path = parsedURL.path
+    if parsedURL.query:
+        path = path + '?' + parsedURL.query
+
+    if isinstance(data, (bytes, bytearray)):
+        data = data.decode('utf8')
+
+    # print "Computing HMAC: %s" % verb + path + str(nonce) + data
+    message = verb + path + str(nonce) + data
+
+    signature = hmac.new(bytes(secret, 'utf8'), bytes(message, 'utf8'), digestmod=hashlib.sha256).hexdigest()
+    return signature
+
+
+"""Taken from BitMEX market maker."""
+class BitmexHeaders(requests.auth.AuthBase):
+    """Attaches API Key Headers to requests."""
+
+    def __init__(self, key, secret):
+        self._key = key
+        self._secret = secret
+
+    def __call__(self, req):
+        """Generate API key headers."""
+        # modify and return the request
+        expires = int(round(time.time()) + 5)  # 5s grace period in case of clock skew
+        req.headers['api-expires'] = str(expires)
+        req.headers['api-key'] = self._key
+        req.headers['api-signature'] = generate_signature(self._secret, req.method, req.url, expires, req.body or '')
+
+        return req

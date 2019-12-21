@@ -6,7 +6,7 @@ from Exceptions import InvalidArgError
 
 class Trade:
     '''
-    class for making orders for Bitmex API.
+    class for making orders to send thru the Bitmex API.
 
     Attributes:
 
@@ -34,7 +34,7 @@ class Trade:
 
     each method returns an order that can be used in a single or bulk order 
     
-    (ie bitmex.place_order(my_order) or bitmex.bulk_order([order1, order2]))
+    (ie bitmex.place_order(my_order) or bitmex.place_bulk_order([order1, order2]))
 
     '''
     def __init__(self, symbol, orderIDPrefex="traderbot_"):
