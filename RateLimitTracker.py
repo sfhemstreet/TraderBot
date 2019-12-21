@@ -33,7 +33,8 @@ class RateLimitTracker:
         manually reset count to 0 and time to current time
 
     `check`
-        checks if ratelimit will be hit, keeps track of count, 
+        checks if ratelimit will be hit, 
+        keeps track of count, 
         sleeps if ratelimit will be hit
 
     `increment`

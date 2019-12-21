@@ -3,15 +3,15 @@ import logging
 import time
 from threading import Thread
 
-logging.basicConfig(filename="test.log", level=logging.DEBUG)
+logging.basicConfig(filename="debug.log", level=logging.DEBUG)
 
 from BitMEX import BitMEX
 from TokenAnalyst import TokenAnalyst
 from Trade import Trade
 from RateLimitTracker import RateLimitTracker
-from config import *
-from check_config import check_config
+from config import check_config
 from colors import c
+from order_logger import order_logger
 
 
 def main():
@@ -20,128 +20,141 @@ def main():
     async def trader_bot(data):
         """
         User trade function, fill in with trade logic.
+
         Recieves blockchain data from Token Analyst websocket.  
+
+        
         """
-        # use trade to make order objects 
-            # ie -  my_order = trade.limit_buy(quantity, price)
-        # use bitmex to submit orders - note that you must use await keyword 
-            # ie -  order_info = await bitmex.place_order(my_order)
-        # use token_analyst to check for inflow / outflow 
-            # ie -  result = token_analyst.chech_for_inflow(data, threshold?, exchange?)
-
-        
-        # Example Code -
-        #   in this example we will trigger a trade based on Inflows over a certain value.
-        #   when we get data that is an Inflow and above our threshold, 
-        #   we will check our positions on Bitmex and either sell our positions if we have any open
-        #   or open a short position if we do not
-        #---------------------------------------
-
-        print(data)
-
-        # set a threshold to watch for
-        inflow_threshold = 0.0000001
-
-        # check if data is an inflow
-        # here we will supply a threshold to filter results to only those above our inflow_threshold 
-        result = token_analyst.check_for_inflow(data=data, threshold=inflow_threshold, exchange='All')
-
-        if result:
-            # check if you are going to above the ratelimit before doing any trades
-            # check method must be awaited because we might async sleep
-            rate_limit.check(will_increment=False)
-
-            # lets see if we have any positions open that we might want to sell
-            position = bitmex.get_last_position()
-
-            if position:
-                position_qty = position['currentQty']
-
-                if position_qty > 0:
-
-                    # lets sell a little below the market price, 
-                    # note that price must be integer or .5, otherwise you will get a tickSize error 
-                    price = int(position['markPrice'] - 1)
-
-                    # make an order
-                    sell_order = trade.limit_sell(quantity=position_qty, price=price)
-
-                    # send to bitmex, 
-                    # we get back the order details that we can use to ammend/cancel/track the order
-                    order_details = await bitmex.place_order(sell_order)
-
-                    # keep track of rate limit
-                    rate_limit.increment()
-                    return
-                
-            last_price = bitmex.get_last_trade_price()
-
-            if last_price:
-                # important! make sure price is integer or .5, otherwise you will get a tickSize error  
-                short_price = int(last_price - 100)
-                short_order = trade.limit_sell(quantity=10, price=short_price)
-                short_order_details = await bitmex.place_order(short_order)
-                # keep track of rate limit
-                rate_limit.increment()
-
         
 
+        #print('\n get positions \n', bitmex.get_position_data())
+        #print('\n margin \n', bitmex.get_margin_data())
+        #print('\n trade \n', bitmex.get_trade_data())
+        #print('\n wallet \n', bitmex.get_wallet_data())
+        #print('\n exec \n', bitmex.get_execution_data())
+        #print('\n order \n', bitmex.get_order_data())
+        #print('\n last trade price \n', bitmex.get_last_trade_price())
 
-    # End trader_bot 
-    # ------------------------------------ #
+        last_trade_price = bitmex.get_last_trade_price()
+
+        inflow_threshold = 100
+        outflow_threshold = 100
+
+        inflow_result = token_analyst.check_for_inflow(data=data, threshold=inflow_threshold, exchange='All')
+        outflow_result = token_analyst.check_for_outflow(data=data, threshold=outflow_threshold, exchange='All')
 
 
-    logging.debug(f"---- New Start ----")
+        if outflow_result:
 
-    # check config gets API keys 
-    TOKEN_ANALYST_API_KEY, BITMEX_API_KEY, BITMEX_API_SECRET = check_config()
+            rate_limit.check(will_sleep=True, will_increment=True)
 
-    # init TokenAnalyst with api-key
-    token_analyst = TokenAnalyst(TOKEN_ANALYST_API_KEY)
+            price = int(last_trade_price - 100)
 
-    # init BitMEX with api-key and secret (supply 'base_url' to do real trades, default is testnet url) 
-    bitmex = BitMEX(key=BITMEX_API_KEY, secret=BITMEX_API_SECRET, symbol=G_DEFAULT_BITMEX_SYMBOL, base_url=G_DEFAULT_BITMEX_BASE_URL, ws_url=G_DEFAULT_BITMEX_WS_URL )
+            limit_buy_order = trade.limit_buy(quantity=10, price=price)
 
-    # init Trade with symbol
-    trade = Trade(symbol=G_DEFAULT_BITMEX_SYMBOL)
+            order_reponse = await bitmex.place_order(order=limit_buy_order)
 
-    # keep track of trades per minute to avoid rate limit
-    rate_limit = RateLimitTracker()
+            my_orders.append(order_reponse)
 
-    # create asyncio event loop
+            order_logger.info("outflow trade - limit buy order - %s - response - %s" % (limit_buy_order, order_reponse))
+
+
+        if inflow_result:
+            
+            rate_limit.check(will_sleep=True, will_increment=True)
+
+            price = int(last_trade_price + 10)
+
+            limit_sell_order = trade.limit_sell(quantity=10, price=price)
+
+            order_reponse = await bitmex.place_order(order=limit_sell_order)
+
+            my_orders.append(order_reponse)
+
+            order_logger.info("inflow trade - limit sell order - %s - response - %s" % (limit_sell_order, order_reponse))
+
+
+    # ----------------- end trader_bot ------------------- #
+
+
+    logging.debug("---------------- New Start -------------------")
+    order_logger.info("---------------- New Start -------------------")
+
+    (
+        TOKEN_ANALYST_API_KEY, 
+        BITMEX_API_KEY, 
+        BITMEX_API_SECRET, 
+        DEFAULT_BITMEX_SYMBOL, 
+        BITMEX_BASE_URL, 
+        BITMEX_WS_URL
+    ) = check_config()
+
+    token_analyst = TokenAnalyst(key=TOKEN_ANALYST_API_KEY)
+
+    bitmex = BitMEX(
+        key=BITMEX_API_KEY, 
+        secret=BITMEX_API_SECRET, 
+        symbol=DEFAULT_BITMEX_SYMBOL, 
+        base_url=BITMEX_BASE_URL, 
+        ws_url=BITMEX_WS_URL 
+    )
+
+    trade = Trade(
+        symbol=DEFAULT_BITMEX_SYMBOL,
+        orderIDPrefex="traderbot_"
+    )
+
+    rate_limit = RateLimitTracker(
+        limit=30, 
+        timeframe=60
+    )
+
+    my_orders = []
+
+
+    # Below creates an event loop and 2 main tasks, 
+    # reading the Bitmex and Token Analyst websockets.
+    #
+    # Connecting to Bitmex gets us updates on
+    # position, margin, order, wallet, execution and trade data.
+    #
+    # Connecting to the Token Analyst websocket 
+    # yields us on-chain data we can use to make trades.
+    # When that data is recieved it is sent to the 
+    # trader_bot function above for us to act on. 
+
     loop = asyncio.get_event_loop() 
 
-    # Websocket loop for streaming Token Analyst data 
-    # sends data to trader_bot 
     async def token_analyst_ws_loop():
-        """Recieves websocket data from Token Analyst and sends data to traderBot."""
+        """
+        Connects to Token Analyst websocket, 
+        recieves on-chain data and sends data to trader_bot.
+        
+        """
         async for data in token_analyst.connect():
             if(data == None):
                 continue
             else:
                 await trader_bot(data)
-          
-    # Websocket Loop for streaming Bitmex data
-    async def bitmex_ws_loop():
-        """Connect to bitmex websocket to get updates on market and user data."""
-        await bitmex.connect()
 
-    try:
-        # Create tasks for both websockets 
+        
+    async def bitmex_ws_loop():
+        """
+        Connects to bitmex websocket to get updates on 
+        position, margin, order, wallet, and trade data.
+        
+        """
+        await bitmex.connect()
+        
+
+    try: 
         loop.create_task(bitmex_ws_loop())
         loop.create_task(token_analyst_ws_loop())
-        # RUN 
+        
         loop.run_forever()
     finally:
         loop.stop() 
-    
-
-async def do_this_after_delay(delay, do_this):
-    '''Executes function 'do_this' after non-block sleeping the 'delay' time.'''
-    await asyncio.sleep(delay)
-    await do_this()
 
 
 if __name__ == "__main__":
     main()
-

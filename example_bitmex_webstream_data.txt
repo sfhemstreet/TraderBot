@@ -205,19 +205,42 @@
     ]
 }
 
-position {'table': 'position', 'action': 'update', 'data': [{'account': 252381, 'symbol': 'XBTUSD', 'currency': 'XBt', 'currentTimestamp': '2019-12-03T01:47:05.335Z', 'markPrice': 7359.22, 'markValue': -149468, 'riskValue': 291888, 'homeNotional': 0.00149468, 'posCross': 389, 'posMargin': 1994, 'maintMargin': 1605, 'unrealisedGrossPnl': -389, 'unrealisedPnl': -389, 'unrealisedPnlPcnt': -0.0026, 'unrealisedRoePcnt': -0.2609, 'timestamp': '2019-12-03T01:47:05.335Z', 'lastPrice': 7359.22, 'lastValue': -149468, 'currentQty': 11, 'liquidationPrice': 158}]}
 
-margin {'table': 'margin', 'action': 'update', 'data': [{'account': 252381, 'currency': 'XBt', 'grossMarkValue': 149468, 'riskValue': 291888, 'maintMargin': 1605, 'unrealisedPnl': -389, 'marginBalance': 6830672, 'marginLeverage': 0.021881888048496546, 'excessMargin': 6827427, 'availableMargin': 6827427, 'withdrawableMargin': 6827427, 'timestamp': '2019-12-03T01:47:05.477Z', 'grossLastValue': 149468}]}
 
-trade {'table': 'trade', 'action': 'insert', 'data': [{'timestamp': '2019-12-03T01:47:08.607Z', 'symbol': 'XBTUSD', 'side': 'Sell', 'size': 1, 'price': 7347.5, 'tickDirection': 'MinusTick', 'trdMatchID': 'b819f080-df69-0613-c016-327614b93da5', 'grossValue': 13610, 'homeNotional': 0.0001361, 'foreignNotional': 1}]}
 
-order {'table': 'order', 'action': 'insert', 'data': [{'orderID': '5a93bd82-c1ad-f334-c83a-6bb1393ec112', 'clOrdID': '', 'clOrdLinkID': '', 'account': 252381, 'symbol': 'XBTUSD', 'side': 'Sell', 'simpleOrderQty': None, 'orderQty': 1, 'price': None, 'displayQty': None, 'stopPx': None, 'pegOffsetValue': None, 'pegPriceType': '', 'currency': 'USD', 'settlCurrency': 'XBt', 'ordType': 'Market', 'timeInForce': 'ImmediateOrCancel', 'execInst': '', 'contingencyType': '', 'exDestination': 'XBME', 'ordStatus': 'New', 'triggered': '', 'workingIndicator': False, 'ordRejReason': '', 'simpleLeavesQty': None, 'leavesQty': 1, 'simpleCumQty': None, 'cumQty': 0, 'avgPx': None, 'multiLegReportingType': 'SingleSecurity', 'text': 'Submission from testnet.bitmex.com', 'transactTime': '2019-12-03T01:47:08.607Z', 'timestamp': '2019-12-03T01:47:08.607Z'}]}
-order {'table': 'order', 'action': 'update', 'data': [{'orderID': '5a93bd82-c1ad-f334-c83a-6bb1393ec112', 'price': 7347.5, 'workingIndicator': True, 'clOrdID': '', 'account': 252381, 'symbol': 'XBTUSD', 'timestamp': '2019-12-03T01:47:08.607Z'}]}
-order {'table': 'order', 'action': 'update', 'data': [{'orderID': '5a93bd82-c1ad-f334-c83a-6bb1393ec112', 'ordStatus': 'Filled', 'workingIndicator': False, 'leavesQty': 0, 'cumQty': 1, 'avgPx': 7347.5, 'clOrdID': '', 'account': 252381, 'symbol': 'XBTUSD', 'timestamp': '2019-12-03T01:47:08.607Z'}]}
-
-position {'table': 'position', 'action': 'update', 'data': [{'account': 252381, 'symbol': 'XBTUSD', 'currency': 'XBt', 'execSellQty': 1, 'execSellCost': 13610, 'execQty': 10, 'execCost': -135469, 'execComm': 121, 'currentTimestamp': '2019-12-03T01:47:08.609Z', 'currentQty': 10, 'currentCost': -136729, 'currentComm': 340, 'realisedCost': -1203, 'unrealisedCost': -135526, 'grossExecCost': 135527, 'markValue': -135880, 'riskValue': 278300, 'homeNotional': 0.0013588, 'foreignNotional': -10, 'posCost': -135526, 'posCost2': -135526, 'posCross': 354, 'posInit': 1356, 'posComm': 103, 'posMargin': 1813, 'posMaint': 781, 'maintMargin': 1459, 'realisedGrossPnl': 1203, 'realisedPnl': 863, 'unrealisedGrossPnl': -354, 'unrealisedPnl': -354, 'unrealisedRoePcnt': -0.2612, 'breakEvenPrice': 7389, 'marginCallPrice': 144, 'liquidationPrice': 144, 'bankruptPrice': 144, 'timestamp': '2019-12-03T01:47:08.609Z', 'lastValue': -135880, 'markPrice': 7359.22}]}
-
-margin {'table': 'margin', 'action': 'update', 'data': [{'account': 252381, 'currency': 'XBt', 'grossComm': 340, 'grossExecCost': 135527, 'grossMarkValue': 135880, 'riskValue': 278300, 'maintMargin': 1459, 'realisedPnl': 863, 'unrealisedPnl': -354, 'walletBalance': 6830994, 'marginBalance': 6830640, 'marginLeverage': 0.019892718691074337, 'excessMargin': 6827541, 'availableMargin': 6827541, 'withdrawableMargin': 6827541, 'timestamp': '2019-12-03T01:47:08.610Z', 'grossLastValue': 135880}]}
-
-trade {'table': 'trade', 'action': 'insert', 'data': [{'timestamp': '2019-12-03T01:47:09.036Z', 'symbol': 'XBTUSD', 'side': 'Sell', 'size': 3, 'price': 7347.5, 'tickDirection': 'ZeroMinusTick', 'trdMatchID': 'ddc3d4d0-86c1-994d-ab53-8e59971c04c7', 'grossValue': 40830, 'homeNotional': 0.0004083, 'foreignNotional': 3}]}
-
+Example - Response from placing an order on Bitmex
+{
+    'orderID': 'order_id', 
+    'clOrdID': 'traderbot_randomstuff', 
+    'clOrdLinkID': '', 
+    'account': 12345, 
+    'symbol': 'XBTUSD', 
+    'side': 'Sell', 
+    'simpleOrderQty': None, 
+    'orderQty': 10, 
+    'price': 7074, 
+    'displayQty': None, 
+    'stopPx': None, 
+    'pegOffsetValue': None, 
+    'pegPriceType': '', 
+    'currency': 'USD', 
+    'settlCurrency': 'XBt', 
+    'ordType': 'Limit', 
+    'timeInForce': 'GoodTillCancel', 
+    'execInst': '', 
+    'contingencyType': '', 
+    'exDestination': 'XBME', 
+    'ordStatus': 'Filled', 
+    'triggered': '', 
+    'workingIndicator': False, 
+    'ordRejReason': '', 
+    'simpleLeavesQty': None, 
+    'leavesQty': 0, 
+    'simpleCumQty': None, 
+    'cumQty': 10, 
+    'avgPx': 7169, 
+    'multiLegReportingType': 'SingleSecurity', 
+    'text': 'Submitted via API.', 
+    'transactTime': '2019-12-20T17:42:08.436Z', 
+    'timestamp': '2019-12-20T17:42:08.436Z'
+}
