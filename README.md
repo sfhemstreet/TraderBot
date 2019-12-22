@@ -1,6 +1,6 @@
 # TraderBot
 
-Project to test using real-time bitcoin inflow/outflow data from the Token Analyst websocket feed 
+Trading Bot that uses real-time bitcoin inflow/outflow data from [Token Analyst's](https://www.tokenanalyst.io/) websocket feed 
 to trigger trades on the BitMEX exchange.
 
 
