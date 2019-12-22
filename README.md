@@ -54,7 +54,7 @@ NOTE : Default config.py settings place all Bitmex orders on the Bitmex testnet.
 
 *Example* - 
 
-if trader_bot recieves an outflow on Bitmex above the threshold, make a limit buy order and place it on Bitmex. 
+if trader_bot receives an outflow on Bitmex above the threshold, make a limit buy order and place it on Bitmex. 
 ```
 last_trade_price = bitmex.get_last_trade_price()
 
