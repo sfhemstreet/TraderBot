@@ -26,52 +26,20 @@ def main():
         
         """
         
-
-        #print('\n get positions \n', bitmex.get_position_data())
-        #print('\n margin \n', bitmex.get_margin_data())
-        #print('\n trade \n', bitmex.get_trade_data())
-        #print('\n wallet \n', bitmex.get_wallet_data())
-        #print('\n exec \n', bitmex.get_execution_data())
-        #print('\n order \n', bitmex.get_order_data())
-        #print('\n last trade price \n', bitmex.get_last_trade_price())
-
         last_trade_price = bitmex.get_last_trade_price()
 
-        inflow_threshold = 100
-        outflow_threshold = 100
-
-        inflow_result = token_analyst.check_for_inflow(data=data, threshold=inflow_threshold, exchange='All')
-        outflow_result = token_analyst.check_for_outflow(data=data, threshold=outflow_threshold, exchange='All')
-
+        outflow_threshold = 1000
+        outflow_result = token_analyst.check_for_outflow(data=data, threshold=outflow_threshold)
 
         if outflow_result:
-
-            rate_limit.check(will_sleep=True, will_increment=True)
-
-            price = int(last_trade_price - 100)
-
-            limit_buy_order = trade.limit_buy(quantity=10, price=price)
-
-            order_reponse = await bitmex.place_order(order=limit_buy_order)
-
-            my_orders.append(order_reponse)
-
-            order_logger.info("outflow trade - limit buy order - %s - response - %s" % (limit_buy_order, order_reponse))
-
-
-        if inflow_result:
+            rate_limit.check()
             
-            rate_limit.check(will_sleep=True, will_increment=True)
-
-            price = int(last_trade_price + 10)
-
-            limit_sell_order = trade.limit_sell(quantity=10, price=price)
-
-            order_reponse = await bitmex.place_order(order=limit_sell_order)
-
+            price = int(last_trade_price - 100)
+            my_order = trade.limit_buy(quantity=10, price=price)
+            order_reponse = await bitmex.place_order(order=my_order)
+            
             my_orders.append(order_reponse)
-
-            order_logger.info("inflow trade - limit sell order - %s - response - %s" % (limit_sell_order, order_reponse))
+            order_logger.info("outflow trade - %s - response - %s" % (my_order, order_reponse))
 
 
     # ----------------- end trader_bot ------------------- #
@@ -131,7 +99,7 @@ def main():
         recieves on-chain data and sends data to trader_bot.
         
         """
-        async for data in token_analyst.connect():
+        async for data in token_analyst.connect(channel="btc_confirmed_exchange_flows"):
             if(data == None):
                 continue
             else:

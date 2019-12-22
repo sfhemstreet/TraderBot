@@ -1,12 +1,25 @@
 # TraderBot
 
-Project to test reading on-chain data from
-Token Analyst's websocket to trigger trades on the
-BitMEX exchange.
+Project to test using real-time bitcoin inflow/outflow data from the Token Analyst websocket feed 
+to trigger trades on the BitMEX exchange.
 
-- Connects to Token Analyst websocket for on-chain data
-- Connects to BitMEX websocket for realtime user/trade data
-- Uses Bitmex REST API to buy/sell XBTUSD
+
+## Description
+
+Uses asyncio to asynchronously connect to both Token Analyst and BitMEX websockets. 
+
+The TokenAnalyst websocket feed provides real-time bitcoin inflows and outflows to/from exchanges.
+
+The Bitmex websocket feed provides user position, margin, order, wallet, execution and trade data.
+
+
+**Features**
+
+- Asynchronously connect to Token Analyst's and Bitmex's websockets
+- Check for inflows/outflows, filter by exchange and by value
+- Make orders for Bitmex
+- Interact with Bitmex REST API to place/amend/cancel orders, update leverage, etc
+- Avoid hitting rate-limit / being labeled as a spam-account
 
 
 ## Requirements
@@ -18,17 +31,50 @@ BitMEX exchange.
 ## Getting Started
 
 - Clone or download project
-- Install requirements: pip install -r requirements.txt
+- Install requirements: `pip install -r requirements.txt`
 - Set up config.py 
     - enter your Token Analyst API key, and BitMEX API key and secret
-        - you can optionally save your API keys as environment variables
+        - or save your API keys/secrets as environment variables
     - choose symbol and BitMEX endpoints 
-        - (default symbol is XBTUSD, and default endpoints use the BitMEX testnet)
+        - default symbol is XBTUSD, and default endpoints use the BitMEX testnet
 - in TraderBot.py, write your own trade logic in the trader_bot function 
 - run TraderBot.py 
+
+
+## Usage
+
+NOTE : Default config.py settings place all Bitmex orders on the Bitmex testnet.
+
+
+**Read on-chain data and execute trades using the trader_bot function in TraderBot.py**
+
+- `token_analyst` use to check websocket feed data for trade triggering values
+- `trade` use to create orders 
+- `bitmex` use to get position, margin, order, wallet, execution and trade data, and to place/amend/cancel orders, update leverage, etc on the Bitmex exchange
+
+*Example* - 
+
+if trader_bot recieves an outflow on Bitmex above the threshold, make a limit buy order and place it on Bitmex. 
+```
+last_trade_price = bitmex.get_last_trade_price()
+
+outflow_threshold = 1000
+outflow_result = token_analyst.check_for_outflow(data=data, threshold=outflow_threshold)
+
+if outflow_result:
+    rate_limit.check()
+    
+    price = int(last_trade_price - 100)
+    my_order = trade.limit_buy(quantity=10, price=price)
+    order_reponse = await bitmex.place_order(order=my_order)
+    
+    my_orders.append(order_reponse)
+    order_logger.info("outflow trade - %s - response - %s" % (my_order, order_reponse))
+```
 
 
 ## License
 
 This project is licensed under the MIT License 
+
 

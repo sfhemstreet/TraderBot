@@ -593,8 +593,6 @@ class BitMEX:
         """Returns websocket args to subscribe to position, margin, order, wallet, and trade."""
         trade = "trade:" + self.symbol
 
-        # to filter results 
-
         args = [
             "position",
             "margin",
@@ -607,7 +605,16 @@ class BitMEX:
        
 
     async def _ws_subscribe(self, args):
-        """Subscribes to data on bitmex websocket. Takes in array of args for what to subscribe to."""
+        """
+        Subscribes to data on bitmex websocket. 
+        
+        Takes in array of args for what to subscribe to.
+        
+        Revc's msgs and gets it's type, either
+        Info, Success, Error or Table ( data we subscribed to )
+
+        Sends table data to _store_table_info
+        """
         
         id = "bitMEX_stream"
         payload = {
@@ -631,7 +638,11 @@ class BitMEX:
             
     
     async def _interpret_msg_type(self, response, id):
-        """Gets response from websocket and returns type of response, ie table, info, success, error."""
+        """
+        Gets response from websocket and returns type of response, ie table, info, success, error.
+        
+        """
+
         if 'info' in response:
             print(c[1] + f"\n{response['info']} Limit : {response['limit']}" + c[0]) 
             return 'INFO'
