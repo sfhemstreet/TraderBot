@@ -6,7 +6,7 @@ to trigger trades on the BitMEX exchange.
 
 ## Description
 
-Uses asyncio to asynchronously connect to both Token Analyst and BitMEX websockets. 
+Uses asyncio and websockets to connect to both Token Analyst and BitMEX websockets. 
 
 The TokenAnalyst websocket feed provides real-time bitcoin inflows and outflows to/from exchanges.
 

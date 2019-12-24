@@ -570,27 +570,37 @@ class BitMEX:
             ]
         }
 
-        # connect to websocket with no timeout time
-        async with websockets.connect(uri, ping_timeout=None) as websocket:
-            self._ws = websocket
-            await websocket.send(json.dumps(payload))
+        while True:
+            try:
+                # connect to websocket with no timeout time
+                async with websockets.connect(uri, ping_timeout=None) as websocket:
+                    self._ws = websocket
+                    await websocket.send(json.dumps(payload))
 
-            # check data in the init response from websocket
-            async for raw_msg in websocket: 
-                msg_type = await self._interpret_msg_type(json.loads(raw_msg),id)
-                if msg_type == 'INFO':
-                    pass
-                elif msg_type == 'SUCCESS':
-                    # we are connected, subscribe to channels we want
-                    args = await self._get_all_info() 
-                    await self._ws_subscribe(args)
-                elif msg_type == 'ERROR':
-                    raise WebSocketError(json.loads(raw_msg),"ERROR CONNECTING TO BITMEX WEBSOCKET")
-                    return
+                    # check data in the init response from websocket
+                    async for raw_msg in websocket: 
+                        msg_type = await self._interpret_msg_type(json.loads(raw_msg),id)
+                        if msg_type == 'INFO':
+                            pass
+                        elif msg_type == 'SUCCESS':
+                            # we are connected, subscribe to channels we want
+                            args = await self._get_all_info() 
+                            await self._ws_subscribe(args)
+                        elif msg_type == 'ERROR':
+                            raise WebSocketError(json.loads(raw_msg),"ERROR CONNECTING TO BITMEX WEBSOCKET")
+            except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
+                print(c[2] + "\n\nBitmex websocket connection error, trying to reconnect in 5 secs\n\n" + c[0])
+                await asyncio.sleep(5)
+                continue
+                        
          
 
     async def _get_all_info(self):
-        """Returns websocket args to subscribe to position, margin, order, wallet, and trade."""
+        """Returns websocket args to subscribe to position, margin, order, wallet, and trade.
+        
+        If you want to subscribe to more Bitmex endpoints, add it here. 
+        """
+        # only subscribes to trades of same symbol 
         trade = "trade:" + self.symbol
 
         args = [

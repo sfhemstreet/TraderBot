@@ -161,7 +161,16 @@ class TokenAnalyst:
 
     async def connect(self, channel="btc_confirmed_exchange_flows"):
         """
-        Connects to Token Analyst websocket, and yields on-chain data.
+        Connects to Token Analyst websocket channel, and yields on-chain data.
+
+        Valid Channel Options are --
+
+        `btc_confirmed_exchange_flows` -  all BTC transactions going into, out of, and in-between exchanges on-chain
+
+        `btc_unconfirmed_exchange_flows` - all BTC transactions going into, out of, 
+            and in-between exchanges on-chain straight from the Bitcoin memory pool (unconfirmed transactions) 
+
+        `btc_confirmed_value_flows` which has all value flows on-chain (with no filtering)
 
         async func - use await
 
@@ -176,7 +185,6 @@ class TokenAnalyst:
             see Token Analyst API docs for details 
 
         """
-
         uri = "wss://ws.tokenanalyst.io"
         id = "token_analyst_stream"
         payload = {
@@ -186,14 +194,20 @@ class TokenAnalyst:
             "key":self._key
         }
 
-        # connect to websocket with no ping timeout - longer connection
-        async with websockets.connect(uri, ping_timeout=None) as websocket:
-            self._ws = websocket
-            await websocket.send(json.dumps(payload))
-            async for msg in websocket: 
-                # check msg for data, returns None or on-chain data
-                data = await self._interpret(json.loads(msg), id)
-                yield data 
+        while True:
+            try:
+                # connect to websocket with no ping timeout - longer connection
+                async with websockets.connect(uri, ping_timeout=None) as websocket:
+                    self._ws = websocket
+                    await websocket.send(json.dumps(payload))
+                    async for msg in websocket: 
+                        # check msg for data, returns None or on-chain data
+                        data = await self._interpret(json.loads(msg), id)
+                        yield data 
+            except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
+                print(c[2] + "\n\nToken Analyst websocket connection error, trying to reconnect in 5 secs\n\n" + c[0])
+                await asyncio.sleep(5)
+                continue
 
 
     async def close(self):
