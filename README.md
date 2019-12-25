@@ -47,11 +47,12 @@ NOTE : Default config.py settings place all Bitmex orders on the Bitmex testnet.
 
 All inflow/outflow data is sent to trader_bot in TraderBot.py, this should be the starting point for any actions.
 
-3 classes instances are available inside trader_bot,
+4 classes instances are available inside trader_bot,
 
 - `token_analyst` - to check websocket feed data 
 - `trade` - to create orders, ie market sell, limit buy, stop order, etc
 - `bitmex`  - to get position, margin, order, wallet, execution and trade data, and to place/amend/cancel orders, update leverage, etc on the Bitmex exchange
+- `rate_limit` - to keep count of API calls and avoid hitting limit 
 
 *Example* - 
 
