@@ -45,12 +45,13 @@ The Bitmex websocket feed provides user position, margin, order, wallet, executi
 
 NOTE : Default config.py settings place all Bitmex orders on the Bitmex testnet.
 
+All inflow/outflow data is sent to trader_bot in TraderBot.py, this should be the starting point for any actions.
 
-**Read on-chain data and execute trades using the trader_bot function in TraderBot.py**
+3 classes instances are available inside trader_bot,
 
-- `token_analyst` use to check websocket feed data for trade triggering values
-- `trade` use to create orders 
-- `bitmex` use to get position, margin, order, wallet, execution and trade data, and to place/amend/cancel orders, update leverage, etc on the Bitmex exchange
+- `token_analyst` - to check websocket feed data 
+- `trade` - to create orders, ie market sell, limit buy, stop order, etc
+- `bitmex`  - to get position, margin, order, wallet, execution and trade data, and to place/amend/cancel orders, update leverage, etc on the Bitmex exchange
 
 *Example* - 
 
