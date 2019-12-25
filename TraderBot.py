@@ -25,7 +25,14 @@ def main():
 
         
         """
-        
+
+        # EXAMPLE 
+        # - checks for outflow above threshold to Bitmex
+        # - checks to see if we can make API and stay within rate limit  
+        # - makes limit buy order
+        # - places order on Bitmex
+        # - logs order and order reponse
+
         last_trade_price = bitmex.get_last_trade_price()
 
         outflow_threshold = 1000
